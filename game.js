@@ -1,17 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scrolling Platformer</title>
-<style>
-    html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
-    canvas { display: block; }
-</style>
-</head>
-<body>
-<canvas id="gameCanvas"></canvas>
-<script>
 /* ====== VIEW CONSTANTS ======
 const SCREEN_WIDTH  = 1920;
 const SCREEN_HEIGHT = 1080;
@@ -436,6 +422,3 @@ window.addEventListener("resize", () => {
 });
 
 window.addEventListener("load", init);
-</script>
-</body>
-</html>
