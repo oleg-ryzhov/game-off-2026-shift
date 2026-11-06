@@ -8,10 +8,7 @@ let playerObj;
 let gameStarted = false;
 let isPaused = false;
 
-let keys = {
-    w: false, a: false, s: false, d: false,
-    ArrowLeft: false, ArrowUp: false, ArrowRight: false, ArrowDown: false
-};
+let keys = { space: false, a: false, d: false };
 
 class Player {
     constructor(x, y) {
