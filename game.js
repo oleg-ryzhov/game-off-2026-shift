@@ -19,27 +19,27 @@ class Player {
         this.y = y;
         this.width = 80;
         this.height = 80;
-        this.speedX = 0;
-        this.speedY = 0;
+        this.velX = 0;
+        this.velY = 0;
         this.speed = 8;
     }
 
     update() {
-        this.speedX = 0;
-        this.speedY = 0;
+        this.velX = 0;
+        this.velY = 0;
 
-        if (keys.w && !keys.s) this.speedY = -this.speed;
-        if (keys.s && !keys.w) this.speedY = this.speed;
-        if (keys.a && !keys.d) this.speedX = -this.speed;
-        if (keys.d && !keys.a) this.speedX = this.speed;
+        if (keys.w && !keys.s) this.velY = -this.speed;
+        if (keys.s && !keys.w) this.velY = this.speed;
+        if (keys.a && !keys.d) this.velX = -this.speed;
+        if (keys.d && !keys.a) this.velX = this.speed;
 
-        if (this.speedX !== 0 && this.speedY !== 0) {
-            this.speedX *= Math.SQRT1_2;
-            this.speedY *= Math.SQRT1_2;
+        if (this.velX !== 0 && this.velY !== 0) {
+            this.velX *= Math.SQRT1_2;
+            this.velY *= Math.SQRT1_2;
         }
 
-        this.x += this.speedX;
-        this.y += this.speedY;
+        this.x += this.velX;
+        this.y += this.velY;
 
         this.x = Math.max(0, Math.min(this.x, gameArea.width - this.width));
         this.y = Math.max(0, Math.min(this.y, gameArea.height - this.height));
