@@ -1,4 +1,4 @@
-/* ====== VIEW CONSTANTS ======
+/* ====== VIEW CONSTANTS ====== */
 const SCREEN_WIDTH  = 1920;
 const SCREEN_HEIGHT = 1080;
 const WORLD_SCREENS_X = 5;
@@ -11,13 +11,13 @@ const VIEW_HEIGHT = SCREEN_HEIGHT;
 
 const tickLength = 20; // 50 tps
 
-/* ====== PHYSICS CONSTANTS ======
+/* ====== PHYSICS CONSTANTS ====== */
 const GRAVITY = 0.9;
 const MAX_FALL_SPEED = 40;
 const MOVE_SPEED = 8;
 const JUMP_SPEED = 30;
 
-/* ====== GAME STATE ======
+/* ====== GAME STATE ====== */
 let frameAccumulator = 0;
 let lastTimestamp = 0;
 let playerObj;
@@ -26,7 +26,7 @@ let isPaused = false;
 
 const keys = { w: false, a: false, s: false, d: false, space: false, p: false };
 
-/* ====== HELPER FUNCTIONS ======
+/* ====== HELPER FUNCTIONS ====== */
 function clamp(v, lo, hi) {
     return Math.max(lo, Math.min(v, hi));
 }
@@ -38,7 +38,7 @@ function isColliding(a, b) {
            a.y + a.height > b.y;
 }
 
-/* ====== LEVEL ======
+/* ====== LEVEL ====== */
 const platforms = [];
 const GROUND_HEIGHT = 60;
 
@@ -149,7 +149,7 @@ class Player {
     }
 }
 
-/* ====== CAMERA ======
+/* ====== CAMERA ====== */
 const camera = {
     x: 0,
     y: 0,
@@ -344,7 +344,7 @@ function drawHud(ctx) {
     }
 }
 
-/* ====== MAIN LOOP ======
+/* ====== MAIN LOOP ====== */
 function engineLoop(currentTime) {
     let deltaTime = currentTime - lastTimestamp;
     lastTimestamp = currentTime;
@@ -366,7 +366,7 @@ function engineLoop(currentTime) {
     requestAnimationFrame(engineLoop);
 }
 
-/* ====== STARTUP ======
+/* ====== STARTUP ====== */
 function startGame() {
     gameStarted = true;
     isPaused = false;
