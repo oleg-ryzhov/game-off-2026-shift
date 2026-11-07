@@ -1,4 +1,4 @@
-/* ====== VIEW CONSTANTS ====== */
+// ====== VIEW CONSTANTS ======
 const SCREEN_WIDTH  = 1920;
 const SCREEN_HEIGHT = 1080;
 const WORLD_SCREENS_X = 5;
@@ -9,15 +9,16 @@ const WORLD_HEIGHT = SCREEN_HEIGHT * WORLD_SCREENS_Y;   // 5400
 const VIEW_WIDTH  = SCREEN_WIDTH;
 const VIEW_HEIGHT = SCREEN_HEIGHT;
 
-const tickLength = 20; // 50 tps
+const tickLength = 20; // 50 TPS
 
-/* ====== PHYSICS CONSTANTS ====== */
+// ====== PHYSICS CONSTANTS ======
 const GRAVITY = 0.9;
 const MAX_FALL_SPEED = 40;
 const MOVE_SPEED = 8;
-const JUMP_SPEED = 30;
+const JUMP_HEIGHT = 125;
+const JUMP_VELOCITY = Math.sqrt(2 * GRAVITY * JUMP_HEIGHT);
 
-/* ====== GAME STATE ====== */
+// ====== GAME STATE ======
 let frameAccumulator = 0;
 let lastTimestamp = 0;
 let playerObj;
@@ -26,7 +27,7 @@ let isPaused = false;
 
 const keys = { w: false, a: false, s: false, d: false, space: false, p: false };
 
-/* ====== HELPER FUNCTIONS ====== */
+// ====== HELPER FUNCTIONS ======
 function clamp(v, lo, hi) {
     return Math.max(lo, Math.min(v, hi));
 }
@@ -38,7 +39,7 @@ function isColliding(a, b) {
            a.y + a.height > b.y;
 }
 
-/* ====== LEVEL ====== */
+// ====== LEVEL ======
 const platforms = [];
 const GROUND_HEIGHT = 60;
 
@@ -65,12 +66,10 @@ class Player {
         this.speed = MOVE_SPEED;
 
         this.onGround = false;
-        this.jumpHeld = false;   // is the jump key still down from this jump?
-        this.jumpCut  = false;   // has the short-hop already been applied?
         this.facing   = 1;
     }
 
-    // ====== UPDATE PLAYER ======
+    // ------ Update Player ------
     update() {
         // ------ Horizontal Input ------
         let dir = 0;
@@ -81,20 +80,10 @@ class Player {
         if (dir !== 0) this.facing = dir;
 
         // ------ Jump Logic ------
-        if (keys.space) {
-            if (this.onGround && !this.jumpHeld) {
-                this.velY     = -JUMP_SPEED;
-                this.onGround = false;
-                this.jumpCut  = false;
-            }
-            this.jumpHeld = true;
-        } else {
-            this.jumpHeld = false;
-            // Short hop: releasing the key early clips the jump once.
-            if (this.velY < 0 && !this.jumpCut) {
-                this.velY *= 0.5;
-                this.jumpCut = true;
-            }
+        // Holding space allows for continuous bunny hopping at a fixed height
+        if (keys.space && this.onGround) {
+            this.velY     = -JUMP_VELOCITY;
+            this.onGround = false;
         }
 
         // ------ Gravity Engine ------
@@ -112,20 +101,20 @@ class Player {
         this.y = clamp(this.y, 0, WORLD_HEIGHT - this.height);
     }
 
-    // ====== COLLISION ENGINE ======
+    // ------ Collision Engine ------
     collide(axis) {
         for (const p of platforms) {
             if (!isColliding(this, p)) continue;
 
-            if (axis === 0) {                       // horizontal
+            if (axis === 0) {                       // Horizontal
                 if (this.velX > 0)      this.x = p.x - this.width;
                 else if (this.velX < 0) this.x = p.x + p.width;
                 this.velX = 0;
-            } else {                                // vertical
-                if (this.velY > 0) {                // falling -> landed
+            } else {                                // Vertical
+                if (this.velY > 0) {                // Falling -> landed
                     this.y = p.y - this.height;
                     this.onGround = true;
-                } else if (this.velY < 0) {         // rising -> bonk
+                } else if (this.velY < 0) {         // Rising -> bonk
                     this.y = p.y + p.height;
                 }
                 this.velY = 0;
@@ -133,12 +122,12 @@ class Player {
         }
     }
 
-    // ====== DRAW PLAYER ======
+    // ------ Draw Player ------
     draw(ctx) {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(this.x, this.y, this.width, this.height);
 
-        // little eyes so you can tell which way you're facing
+        // Little eyes so you can tell which way you're facing
         const eyeSize = this.width * 0.14;
         const eyeY    = this.y + this.height * 0.28;
         const cx      = this.x + this.width / 2 + this.facing * this.width * 0.12;
@@ -149,7 +138,7 @@ class Player {
     }
 }
 
-/* ====== CAMERA ====== */
+// ====== CAMERA ======
 const camera = {
     x: 0,
     y: 0,
@@ -216,7 +205,7 @@ function renderGame() {
     const ctx = gameArea.context;
     if (!ctx) return;
 
-    // --- clear the whole device-sized canvas (letterbox bars) ---
+    // Clear the whole device-sized canvas (letterbox bars)
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, gameArea.canvas.width, gameArea.canvas.height);
@@ -252,7 +241,7 @@ function drawWorld(ctx) {
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(camera.x, camera.y, VIEW_WIDTH, VIEW_HEIGHT);
 
-    // Subtle grid.
+    // ------ Subtle Grid ------
     const GRID = 240;
     ctx.strokeStyle = "#242424";
     ctx.lineWidth = 2;
@@ -281,7 +270,7 @@ function drawWorld(ctx) {
     }
     ctx.stroke();
 
-    // Platforms (culled).
+    // ------ Platforms (Culled) ------
     for (const p of platforms) {
         if (p.x + p.width  < camera.x || p.x > viewRight)  continue;
         if (p.y + p.height < camera.y || p.y > viewBottom) continue;
@@ -299,7 +288,7 @@ function drawHud(ctx) {
 
     // Top-left HUD text has been removed.
 
-    // ---- minimap of the world ----
+    // ------ Minimap Of The World ------
     const mmW = 240;
     const mmH = 135;
     const mmX = VIEW_WIDTH  - mmW - 30;
@@ -314,7 +303,7 @@ function drawHud(ctx) {
     ctx.lineWidth = 2;
     ctx.strokeRect(mmX, mmY, mmW, mmH);
 
-    // camera window
+    // ------ Camera Window ------
     ctx.strokeStyle = "rgba(90, 160, 255, 0.9)";
     ctx.strokeRect(
         mmX + camera.x * kx,
@@ -323,7 +312,7 @@ function drawHud(ctx) {
         VIEW_HEIGHT * ky
     );
 
-    // player blip
+    // ------ Player Blip ------
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(
         mmX + playerObj.x * kx - 2,
@@ -344,13 +333,13 @@ function drawHud(ctx) {
     }
 }
 
-/* ====== MAIN LOOP ====== */
+// ====== MAIN LOOP ======
 function engineLoop(currentTime) {
     let deltaTime = currentTime - lastTimestamp;
     lastTimestamp = currentTime;
 
     if (!Number.isFinite(deltaTime) || deltaTime < 0) deltaTime = 0;
-    if (deltaTime > 250) deltaTime = 250;          // tab was backgrounded
+    if (deltaTime > 250) deltaTime = 250;          // Tab was backgrounded
 
     frameAccumulator += deltaTime;
 
@@ -360,19 +349,19 @@ function engineLoop(currentTime) {
         frameAccumulator -= tickLength;
         steps++;
     }
-    if (steps === 10) frameAccumulator = 0;        // don't build up a debt
+    if (steps === 10) frameAccumulator = 0;        // Don't build up a debt
 
     renderGame();
     requestAnimationFrame(engineLoop);
 }
 
-/* ====== STARTUP ====== */
+// ====== STARTUP ======
 function startGame() {
     gameStarted = true;
     isPaused = false;
 
-    const spawnX = 60;                                        // bottom-left
-    const spawnY = WORLD_HEIGHT - GROUND_HEIGHT - 80;         // standing on the ground
+    const spawnX = 60;                                        // Bottom-left
+    const spawnY = WORLD_HEIGHT - GROUND_HEIGHT - 80;         // Standing on the ground
 
     playerObj = new Player(spawnX, spawnY);
     camera.follow(playerObj);
