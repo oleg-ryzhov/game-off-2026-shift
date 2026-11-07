@@ -15,7 +15,7 @@ const tickLength = 20; // 50 TPS
 const GRAVITY = 0.9;
 const MAX_FALL_SPEED = 40;
 const MOVE_SPEED = 8;
-const JUMP_HEIGHT = 125;
+const JUMP_HEIGHT = 222;
 const JUMP_VELOCITY = Math.sqrt(2 * GRAVITY * JUMP_HEIGHT);
 
 // ====== GAME STATE ======
