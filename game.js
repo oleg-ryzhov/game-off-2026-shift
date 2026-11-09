@@ -301,7 +301,7 @@ function drawHud(ctx) {
 
     ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
     ctx.lineWidth = 2;
-    ctx.strokeRect(mmX, mmY, mmW, mmH); */
+    ctx.strokeRect(mmX, mmY, mmW, mmH);
 
     // ------ Camera Window ------
     ctx.strokeStyle = "rgba(90, 160, 255, 0.9)";
@@ -318,7 +318,7 @@ function drawHud(ctx) {
         mmX + playerObj.x * kx - 2,
         mmY + playerObj.y * ky - 2,
         5, 5
-    );
+    ); */
 
     if (isPaused) {
         ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
