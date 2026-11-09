@@ -109,7 +109,7 @@ class Player {
             if (axis === 0) {                       // Horizontal
                 if (this.velX > 0)      this.x = p.x - this.width;
                 else if (this.velX < 0) this.x = p.x + p.width;
-                this.velX = 0;
+                    this.velX = 0;
             } else {                                // Vertical
                 if (this.velY > 0) {                // Falling -> landed
                     this.y = p.y - this.height;
@@ -289,7 +289,7 @@ function drawHud(ctx) {
     // Top-left HUD text has been removed.
 
     // ------ Minimap Of The World ------
-    const mmW = 240;
+    /* const mmW = 240;
     const mmH = 135;
     const mmX = VIEW_WIDTH  - mmW - 30;
     const mmY = 30;
@@ -301,7 +301,7 @@ function drawHud(ctx) {
 
     ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
     ctx.lineWidth = 2;
-    ctx.strokeRect(mmX, mmY, mmW, mmH);
+    ctx.strokeRect(mmX, mmY, mmW, mmH); */
 
     // ------ Camera Window ------
     ctx.strokeStyle = "rgba(90, 160, 255, 0.9)";
