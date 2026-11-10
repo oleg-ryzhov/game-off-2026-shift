@@ -515,28 +515,9 @@ function drawJumpArc() {
     samples.push(worldToScreen(x, y));
   }
 
-  const auraWidth = Math.max(2, player.size * cam.zoom);
-
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-
-  const layers = [
-    { a: 0.08, w: auraWidth * 1.6 },
-    { a: 0.20, w: auraWidth },
-    { a: 0.45, w: auraWidth * 0.55 }
-  ];
-  for (const L of layers) {
-    ctx.strokeStyle = 'rgba(255, 255, 255, ' + L.a + ')';
-    ctx.lineWidth = L.w;
-    ctx.beginPath();
-    for (let i = 0; i < samples.length; i++) {
-      if (i === 0) ctx.moveTo(samples[i].x, samples[i].y);
-      else ctx.lineTo(samples[i].x, samples[i].y);
-    }
-    ctx.stroke();
-  }
-
   ctx.shadowColor = 'rgba(255, 255, 255, 0.9)';
   ctx.shadowBlur = 12;
   ctx.strokeStyle = '#ffffff';
@@ -549,7 +530,6 @@ function drawJumpArc() {
   }
   ctx.stroke();
   ctx.setLineDash([]);
-
   ctx.restore();
 }
 
