@@ -10,10 +10,10 @@ const VIEW_WIDTH  = SCREEN_WIDTH;
 const VIEW_HEIGHT = SCREEN_HEIGHT;
 
 // ====== PHYSICS CONSTANTS ======
-const GRAVITY = 0.9;
+const GRAVITY = 1.05;
 const MAX_FALL_SPEED = 40;
 const MOVE_SPEED = 9.5;
-const JUMP_HEIGHT = 260;
+const JUMP_HEIGHT = 235;
 const JUMP_VELOCITY = Math.sqrt(2 * GRAVITY * JUMP_HEIGHT);
 
 const SLOPE_STATIC_ANGLE = 22;
