@@ -178,11 +178,22 @@ class Player {
 
         for (const p of platforms) {
             if (!p.rotation) continue;
-            const hit = satCollide(this, p);
+            
+            const testBox = {
+                x: this.x - 2,
+                y: this.y - 2,
+                width: this.width + 4,
+                height: this.height + 4
+            };
+            
+            const hit = satCollide(testBox, p);
             if (!hit) continue;
 
-            this.x += hit.axis.x * hit.depth;
-            this.y += hit.axis.y * hit.depth;
+            const pushDepth = hit.depth - 2;
+            if (pushDepth > 0) {
+                this.x += hit.axis.x * pushDepth;
+                this.y += hit.axis.y * pushDepth;
+            }
 
             const nx = hit.axis.x;
             const ny = hit.axis.y;
@@ -196,8 +207,6 @@ class Player {
                     this.currentSlopeAngle   = angleDeg;
                     this.currentSlopeNormalX = nx;
                     this.currentSlopeNormalY = ny;
-
-                    if (this.velY > 0) this.velY = 0;
 
                     const slopeSign = nx > 0 ? 1 : -1;
                     this.targetTilt = slopeSign * angleDeg;
@@ -214,13 +223,20 @@ class Player {
     }
 
     draw(ctx) {
-        const cx = this.x + this.width / 2;
-        const feetY = this.y + this.height;
+        let pivotX = this.x + this.width / 2;
+        if (this.onSlope || this.slopeCoyote > 0) {
+            if (this.currentSlopeNormalX < 0) {
+                pivotX = this.x + this.width;
+            } else if (this.currentSlopeNormalX > 0) {
+                pivotX = this.x;
+            }
+        }
+        const pivotY = this.y + this.height;
 
         ctx.save();
-        ctx.translate(cx, feetY);
+        ctx.translate(pivotX, pivotY);
         ctx.rotate(this.tilt * Math.PI / 180);
-        ctx.translate(-cx, -feetY);
+        ctx.translate(-pivotX, -pivotY);
 
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(this.x, this.y, this.width, this.height);
