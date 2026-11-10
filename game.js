@@ -25,11 +25,9 @@ const level = [
         blocks: [
             { x: 0, y: WORLD_HEIGHT - GROUND_HEIGHT, width: WORLD_WIDTH, height: GROUND_HEIGHT, rotation: 0 },
             { x: 0, y: 5340, width: 9600, height: 60, rotation: 0 },
-            { x: 2075, y: 4308, width: 1271, height: 482, rotation: 25.4 },
-            { x: 4382, y: 4942, width: 1433, height: 209, rotation: 0 },
-            { x: 4807, y: 5121, width: 22, height: 75, rotation: 0 },
-            { x: 6375, y: 4703, width: 1000, height: 149, rotation: 0 },
-            { x: 8010, y: 4472, width: 1224, height: 164, rotation: 0 }
+            { x: 4098, y: 5278, width: 328, height: 45, rotation: -25.5 },
+            { x: 4598, y: 5151, width: 306, height: 37, rotation: 0 },
+            { x: 5114, y: 5039, width: 485, height: 60, rotation: 0 }
         ]
     }
 ];
