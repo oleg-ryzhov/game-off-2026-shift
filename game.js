@@ -16,17 +16,19 @@ const MOVE_SPEED = 8;
 const JUMP_HEIGHT = 222;
 const JUMP_VELOCITY = Math.sqrt(2 * GRAVITY * JUMP_HEIGHT);
 
+const SLOPE_STATIC_ANGLE = 22;
+const SLOPE_STEEP_ANGLE  = 60;
+const SLOPE_SLIDE_ACCEL  = 2.0;
+const SLOPE_EJECT_SPEED  = 4;
+const SLOPE_MAX_SPEED    = 13;
+
 // ====== LEVEL ======
 const platforms = [];
 
 const level = [
     {
         blocks: [
-            { x: 0, y: WORLD_HEIGHT - 60, width: WORLD_WIDTH, height: 60, rotation: 0 },
-            { x: 0, y: 5340, width: 9600, height: 60, rotation: 0 },
-            { x: 270, y: 5170, width: 118, height: 30, rotation: 0 },
-            { x: 550, y: 5070, width: 118, height: 30, rotation: 0 },
-            { x: 860, y: 5000, width: 140, height: 34, rotation: -18 },
+            { x: 0, y: WORLD_HEIGHT - 60, width: WORLD_WIDTH, height: 60, rotation: 0 }
         ]
     }
 ];
@@ -61,6 +63,15 @@ class Player {
 
         this.onGround = false;
         this.facing   = 1;
+
+        this.tilt        = 0;
+        this.targetTilt  = 0;
+
+        this.onSlope              = false;
+        this.slopeCoyote          = 0;
+        this.currentSlopeAngle    = 0;
+        this.currentSlopeNormalX  = 0;
+        this.currentSlopeNormalY  = -1;
     }
 
     update() {
@@ -68,24 +79,66 @@ class Player {
         if (keys.a && !keys.d) dir = -1;
         else if (keys.d && !keys.a) dir = 1;
 
-        this.velX = dir * this.speed;
-        if (dir !== 0) this.facing = dir;
+        if (dir !== 0) {
+            this.velX = dir * this.speed;
+            this.facing = dir;
+        } else {
+            this.velX *= 0.85;
+            if (Math.abs(this.velX) < 0.3) this.velX = 0;
+        }
 
         if (keys.space && this.onGround) {
-            this.velY     = -JUMP_VELOCITY;
+            this.velY = -JUMP_VELOCITY;
             this.onGround = false;
+            this.onSlope  = false;
+            this.slopeCoyote = 0;
+            this.targetTilt = 0;
         }
 
         this.velY = Math.min(this.velY + GRAVITY, MAX_FALL_SPEED);
+
+        const slopeActive = this.onSlope || this.slopeCoyote > 0;
+
+        if (slopeActive && this.currentSlopeAngle > SLOPE_STATIC_ANGLE) {
+            const slideAng = (this.currentSlopeAngle - SLOPE_STATIC_ANGLE) * Math.PI / 180;
+            const slopeSign = this.currentSlopeNormalX > 0 ? 1 : -1;
+            const downX = -this.currentSlopeNormalY * slopeSign;
+            const accel = GRAVITY * Math.sin(slideAng) * SLOPE_SLIDE_ACCEL;
+            this.velX += downX * accel;
+        }
+
+        if (slopeActive) {
+            const nx = this.currentSlopeNormalX;
+            const ny = this.currentSlopeNormalY;
+            const vDotN = this.velX * nx + this.velY * ny;
+            this.velX -= vDotN * nx;
+            this.velY -= vDotN * ny;
+        }
+
+        const spd = Math.hypot(this.velX, this.velY);
+        if (spd > SLOPE_MAX_SPEED) {
+            this.velX *= SLOPE_MAX_SPEED / spd;
+            this.velY *= SLOPE_MAX_SPEED / spd;
+        }
 
         this.x += this.velX;
         this.collide(0);
 
         this.onGround = false;
+        this.onSlope  = false;
         this.y += this.velY;
         this.collide(1);
 
         this.resolveRotatedCollisions();
+
+        if (this.onSlope) {
+            this.slopeCoyote = 3;
+        } else if (this.slopeCoyote > 0) {
+            this.slopeCoyote--;
+        }
+
+        const tiltFactor = this.onSlope ? 0.18 : 0.15;
+        this.tilt += (this.targetTilt - this.tilt) * tiltFactor;
 
         this.x = clamp(this.x, 0, WORLD_WIDTH  - this.width);
         this.y = clamp(this.y, 0, WORLD_HEIGHT - this.height);
@@ -113,6 +166,8 @@ class Player {
     }
 
     resolveRotatedCollisions() {
+        this.targetTilt = 0;
+
         for (const p of platforms) {
             if (!p.rotation) continue;
             const hit = satCollide(this, p);
@@ -121,26 +176,56 @@ class Player {
             this.x += hit.axis.x * hit.depth;
             this.y += hit.axis.y * hit.depth;
 
-            if (Math.abs(hit.axis.x) > Math.abs(hit.axis.y)) {
-                this.velX = 0;
+            const nx = hit.axis.x;
+            const ny = hit.axis.y;
+
+            if (ny < -0.2) {
+                const angleDeg = Math.acos(Math.min(1, -ny)) * 180 / Math.PI;
+
+                if (angleDeg < SLOPE_STEEP_ANGLE) {
+                    this.onGround = true;
+                    this.onSlope  = true;
+                    this.currentSlopeAngle   = angleDeg;
+                    this.currentSlopeNormalX = nx;
+                    this.currentSlopeNormalY = ny;
+
+                    if (this.velY > 0) this.velY = 0;
+
+                    const slopeSign = nx > 0 ? 1 : -1;
+                    this.targetTilt = slopeSign * angleDeg;
+                } else {
+                    const slideDir = nx > 0 ? 1 : -1;
+                    this.velX += slideDir * SLOPE_EJECT_SPEED;
+                }
+            } else if (ny > 0.2) {
+                if (this.velY < 0) this.velY = 0;
             } else {
-                if (hit.axis.y < 0 && this.velY > 0) this.onGround = true;
-                this.velY = 0;
+                this.velX = 0;
             }
         }
     }
 
     draw(ctx) {
+        const cx = this.x + this.width / 2;
+        const feetY = this.y + this.height;
+
+        ctx.save();
+        ctx.translate(cx, feetY);
+        ctx.rotate(this.tilt * Math.PI / 180);
+        ctx.translate(-cx, -feetY);
+
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(this.x, this.y, this.width, this.height);
 
         const eyeSize = this.width * 0.14;
         const eyeY    = this.y + this.height * 0.28;
-        const cx      = this.x + this.width / 2 + this.facing * this.width * 0.12;
+        const exc     = this.x + this.width / 2 + this.facing * this.width * 0.12;
 
         ctx.fillStyle = "#1a1a1a";
-        ctx.fillRect(cx - this.width * 0.22, eyeY, eyeSize, eyeSize);
-        ctx.fillRect(cx + this.width * 0.22 - eyeSize, eyeY, eyeSize, eyeSize);
+        ctx.fillRect(exc - this.width * 0.22, eyeY, eyeSize, eyeSize);
+        ctx.fillRect(exc + this.width * 0.22 - eyeSize, eyeY, eyeSize, eyeSize);
+
+        ctx.restore();
     }
 }
 
