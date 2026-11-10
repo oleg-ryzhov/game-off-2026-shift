@@ -98,6 +98,8 @@ button.danger:hover { background: #a03030; }
       <b>Right/Middle/SPACE+drag:</b> pan<br>
       <b>Drag player icon:</b> reposition spawn<br>
       <b>SHIFT:</b> fine control (no snap)<br>
+      <b>Ctrl+C / Ctrl+V:</b> copy / paste block<br>
+      <b>Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y:</b> undo / redo<br>
       <b>Arrows:</b> nudge &middot; <b>DEL:</b> delete &middot; <b>ESC:</b> deselect &middot; <b>C:</b> create
     </div>
   </div>
@@ -132,6 +134,131 @@ let jumpDir = 1;
 
 let shiftDown = false;
 let spaceDown = false;
+let mouseScreen = { x: 0, y: 0 };
+let clipboard = null;
+
+let dragStartSnapshot = null;
+let propHistoryPrev = null;
+let propHistoryTimer = null;
+
+const history = {
+  stack: [],
+  index: -1,
+  maxSize: 100,
+  push(state) {
+    this.stack = this.stack.slice(0, this.index + 1);
+    this.stack.push(state);
+    if (this.stack.length > this.maxSize) this.stack.shift();
+    this.index = this.stack.length - 1;
+  },
+  undo() {
+    if (this.index > 0) {
+      this.index--;
+      return this.stack[this.index];
+    }
+    return null;
+  },
+  redo() {
+    if (this.index < this.stack.length - 1) {
+      this.index++;
+      return this.stack[this.index];
+    }
+    return null;
+  }
+};
+
+function snapshot() {
+  return JSON.stringify({
+    blocks: blocks,
+    player: player,
+    selectedIndex: selected ? blocks.indexOf(selected) : -1
+  });
+}
+
+function restore(json) {
+  const data = JSON.parse(json);
+  blocks = data.blocks;
+  player = data.player;
+  selected = data.selectedIndex >= 0 && data.selectedIndex < blocks.length
+    ? blocks[data.selectedIndex]
+    : null;
+  updatePropsUI();
+  render();
+}
+
+function beginHistoryAction() {
+  dragStartSnapshot = snapshot();
+}
+
+function endHistoryAction() {
+  if (dragStartSnapshot !== null && dragStartSnapshot !== snapshot()) {
+    history.push(snapshot());
+  }
+  dragStartSnapshot = null;
+}
+
+function schedulePropertyHistory() {
+  if (propHistoryPrev === null) propHistoryPrev = snapshot();
+  if (propHistoryTimer) clearTimeout(propHistoryTimer);
+  propHistoryTimer = setTimeout(() => {
+    if (propHistoryPrev !== null && propHistoryPrev !== snapshot()) {
+      history.push(snapshot());
+    }
+    propHistoryPrev = null;
+    propHistoryTimer = null;
+  }, 400);
+}
+
+function cancelPropertyHistory() {
+  if (propHistoryTimer) { clearTimeout(propHistoryTimer); propHistoryTimer = null; }
+  propHistoryPrev = null;
+}
+
+function copySelected() {
+  if (!selected) return;
+  clipboard = JSON.parse(JSON.stringify(selected));
+  setStatus('Copied block');
+}
+
+function pasteClipboard() {
+  if (!clipboard) return;
+  const nb = JSON.parse(JSON.stringify(clipboard));
+  const w = screenToWorld(mouseScreen.x, mouseScreen.y);
+  nb.x = snapVal(w.x - nb.width / 2);
+  nb.y = snapVal(w.y - nb.height / 2);
+  blocks.push(nb);
+  selected = nb;
+  updatePropsUI();
+  render();
+  history.push(snapshot());
+  setStatus('Pasted block');
+}
+
+function undoAction() {
+  dragState = null;
+  dragStartSnapshot = null;
+  cancelPropertyHistory();
+  const state = history.undo();
+  if (state) {
+    restore(state);
+    setStatus('Undo');
+  } else {
+    setStatus('Nothing to undo');
+  }
+}
+
+function redoAction() {
+  dragState = null;
+  dragStartSnapshot = null;
+  cancelPropertyHistory();
+  const state = history.redo();
+  if (state) {
+    restore(state);
+    setStatus('Redo');
+  } else {
+    setStatus('Nothing to redo');
+  }
+}
 
 function snapVal(v) {
   if (snapGrid <= 0) return v;
@@ -394,32 +521,21 @@ function drawJumpArc() {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-  ctx.lineWidth = auraWidth * 1.6;
-  ctx.beginPath();
-  for (let i = 0; i < samples.length; i++) {
-    if (i === 0) ctx.moveTo(samples[i].x, samples[i].y);
-    else ctx.lineTo(samples[i].x, samples[i].y);
+  const layers = [
+    { a: 0.08, w: auraWidth * 1.6 },
+    { a: 0.20, w: auraWidth },
+    { a: 0.45, w: auraWidth * 0.55 }
+  ];
+  for (const L of layers) {
+    ctx.strokeStyle = 'rgba(255, 255, 255, ' + L.a + ')';
+    ctx.lineWidth = L.w;
+    ctx.beginPath();
+    for (let i = 0; i < samples.length; i++) {
+      if (i === 0) ctx.moveTo(samples[i].x, samples[i].y);
+      else ctx.lineTo(samples[i].x, samples[i].y);
+    }
+    ctx.stroke();
   }
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.20)';
-  ctx.lineWidth = auraWidth;
-  ctx.beginPath();
-  for (let i = 0; i < samples.length; i++) {
-    if (i === 0) ctx.moveTo(samples[i].x, samples[i].y);
-    else ctx.lineTo(samples[i].x, samples[i].y);
-  }
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-  ctx.lineWidth = auraWidth * 0.55;
-  ctx.beginPath();
-  for (let i = 0; i < samples.length; i++) {
-    if (i === 0) ctx.moveTo(samples[i].x, samples[i].y);
-    else ctx.lineTo(samples[i].x, samples[i].y);
-  }
-  ctx.stroke();
 
   ctx.shadowColor = 'rgba(255, 255, 255, 0.9)';
   ctx.shadowBlur = 12;
@@ -468,6 +584,7 @@ function bindProp(id, field, opts) {
     if (isNaN(v)) return;
     if (opts && opts.min !== undefined) v = Math.max(opts.min, v);
     selected[field] = v;
+    schedulePropertyHistory();
     render();
   });
 }
@@ -479,15 +596,15 @@ bindProp('inpR', 'rotation');
 
 document.getElementById('inpPX').addEventListener('input', e => {
   const v = parseFloat(e.target.value);
-  if (!isNaN(v)) { player.x = v; render(); }
+  if (!isNaN(v)) { player.x = v; schedulePropertyHistory(); render(); }
 });
 document.getElementById('inpPY').addEventListener('input', e => {
   const v = parseFloat(e.target.value);
-  if (!isNaN(v)) { player.y = v; render(); }
+  if (!isNaN(v)) { player.y = v; schedulePropertyHistory(); render(); }
 });
 document.getElementById('inpPSize').addEventListener('input', e => {
   const v = parseFloat(e.target.value);
-  if (!isNaN(v) && v >= 10) { player.size = v; render(); }
+  if (!isNaN(v) && v >= 10) { player.size = v; schedulePropertyHistory(); render(); }
 });
 document.getElementById('inpSnap').addEventListener('input', e => {
   const v = parseFloat(e.target.value);
@@ -510,6 +627,7 @@ document.getElementById('selJumpDir').addEventListener('change', e => {
 });
 
 function startMove(b, w) {
+  beginHistoryAction();
   dragState = {
     type: 'move',
     block: b,
@@ -519,6 +637,7 @@ function startMove(b, w) {
 }
 
 function startResize(b, handleId, w) {
+  beginHistoryAction();
   dragState = {
     type: 'resize',
     block: b,
@@ -530,6 +649,7 @@ function startResize(b, handleId, w) {
 
 function startRotate(b, w) {
   const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+  beginHistoryAction();
   dragState = {
     type: 'rotate',
     block: b,
@@ -559,6 +679,7 @@ function onMouseDown(e) {
 
   if (creating) {
     creating = false;
+    beginHistoryAction();
     const b = { x: snapVal(w.x), y: snapVal(w.y), width: 0, height: 0, rotation: 0 };
     blocks.push(b);
     selected = b;
@@ -592,6 +713,7 @@ function onMouseDown(e) {
 
   if (pointInPlayer(w.x, w.y)) {
     selected = null;
+    beginHistoryAction();
     dragState = {
       type: 'player',
       startMouse: { x: w.x, y: w.y },
@@ -622,6 +744,8 @@ function onMouseMove(e) {
   const rect = canvas.getBoundingClientRect();
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
+  mouseScreen.x = sx;
+  mouseScreen.y = sy;
 
   if (!dragState) return;
 
@@ -741,6 +865,9 @@ function onMouseUp() {
     setStatus('Block created');
     updatePropsUI();
   }
+  if (dragState && dragState.type !== 'pan') {
+    endHistoryAction();
+  }
   dragState = null;
   render();
 }
@@ -772,6 +899,7 @@ document.getElementById('btnDelete').addEventListener('click', () => {
     selected = null;
     updatePropsUI();
     render();
+    history.push(snapshot());
     setStatus('Block deleted');
   }
 });
@@ -824,7 +952,44 @@ function setStatus(t) {
 
 document.addEventListener('keydown', e => {
   const tag = document.activeElement && document.activeElement.tagName;
-  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+  const inInput = tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA';
+
+  const isMac = navigator.platform && /Mac/i.test(navigator.platform);
+  const mod = isMac ? e.metaKey : e.ctrlKey;
+
+  if (mod) {
+    if (!inInput) {
+      const k = e.key.toLowerCase();
+      if (k === 'c') {
+        if (selected) {
+          copySelected();
+          e.preventDefault();
+          return;
+        }
+      }
+      if (k === 'v') {
+        if (clipboard) {
+          pasteClipboard();
+          e.preventDefault();
+          return;
+        }
+      }
+      if (k === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redoAction(); else undoAction();
+        return;
+      }
+      if (k === 'y') {
+        e.preventDefault();
+        redoAction();
+        return;
+      }
+    }
+    if (e.key === 'Shift') shiftDown = true;
+    return;
+  }
+
+  if (inInput) {
     if (e.key === 'Shift') shiftDown = true;
     return;
   }
@@ -852,6 +1017,7 @@ document.addEventListener('keydown', e => {
       selected = null;
       updatePropsUI();
       render();
+      history.push(snapshot());
       setStatus('Block deleted');
     }
     e.preventDefault();
@@ -875,6 +1041,7 @@ document.addEventListener('keydown', e => {
     if (moved) {
       updatePropsUI();
       render();
+      schedulePropertyHistory();
     }
   }
 });
@@ -900,6 +1067,8 @@ window.addEventListener('load', () => {
   resizeCanvas();
   fitView();
   updatePropsUI();
+  history.stack = [snapshot()];
+  history.index = 0;
   setStatus('Ready — press C or + CREATE to add a block');
 });
 </script>
