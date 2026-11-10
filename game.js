@@ -12,13 +12,13 @@ const VIEW_HEIGHT = SCREEN_HEIGHT;
 // ====== PHYSICS CONSTANTS ======
 const GRAVITY = 0.9;
 const MAX_FALL_SPEED = 40;
-const MOVE_SPEED = 8;
-const JUMP_HEIGHT = 222;
+const MOVE_SPEED = 9.5;
+const JUMP_HEIGHT = 260;
 const JUMP_VELOCITY = Math.sqrt(2 * GRAVITY * JUMP_HEIGHT);
 
 const SLOPE_STATIC_ANGLE = 22;
 const SLOPE_STEEP_ANGLE  = 60;
-const SLOPE_SLIDE_ACCEL  = 2.0;
+const SLOPE_SLIDE_ACCEL  = 2.5;
 const SLOPE_EJECT_SPEED  = 4;
 const SLOPE_MAX_SPEED    = 13;
 
@@ -78,6 +78,10 @@ class Player {
         this.currentSlopeAngle    = 0;
         this.currentSlopeNormalX  = 0;
         this.currentSlopeNormalY  = -1;
+
+        this.currentPlatform = null;
+        this.tipVel = 0;
+        this.isTipping = false;
     }
 
     update() {
@@ -99,6 +103,8 @@ class Player {
             this.onSlope  = false;
             this.slopeCoyote = 0;
             this.targetTilt = 0;
+            this.isTipping = false;
+            this.tipVel = 0;
         }
 
         this.velY = Math.min(this.velY + GRAVITY, MAX_FALL_SPEED);
@@ -134,6 +140,7 @@ class Player {
 
         this.onGround = false;
         this.onSlope  = false;
+        this.currentPlatform = null;
         this.y += this.velY;
         this.collide(1);
 
@@ -145,8 +152,48 @@ class Player {
             this.slopeCoyote--;
         }
 
-        const tiltFactor = this.onSlope ? 0.18 : 0.15;
-        this.tilt += (this.targetTilt - this.tilt) * tiltFactor;
+        if (this.onGround && this.currentPlatform) {
+            const p = this.currentPlatform;
+            const cx = this.x + this.width / 2;
+            const cy = this.y + this.height;
+
+            const bx = p.x + p.width / 2;
+            const by = p.y + p.height / 2;
+            const rad = p.rotation * Math.PI / 180;
+            const cos = Math.cos(rad), sin = Math.sin(rad);
+            const dx = cx - bx;
+            const dy = cy - by;
+            const localX = dx * cos + dy * sin;
+
+            let overhang = 0;
+            if (localX > p.width / 2) overhang = localX - p.width / 2;
+            else if (localX < -p.width / 2) overhang = -p.width / 2 - localX;
+
+            if (overhang > 2) {
+                const tdir = localX > 0 ? 1 : -1;
+                this.tipVel += tdir * overhang * 0.002;
+                this.tipVel = clamp(this.tipVel, -0.3, 0.3);
+                this.isTipping = true;
+            } else {
+                this.tipVel *= 0.85;
+                if (Math.abs(this.tipVel) < 0.01) this.isTipping = false;
+            }
+
+            if (this.isTipping) {
+                this.tilt += this.tipVel;
+                if (Math.abs(this.tilt) > 60) {
+                    this.onGround = false;
+                    this.onSlope = false;
+                    this.isTipping = false;
+                }
+            } else {
+                this.tilt += (this.targetTilt - this.tilt) * (this.onSlope ? 0.18 : 0.15);
+            }
+        } else {
+            this.tipVel *= 0.95;
+            this.isTipping = false;
+            this.tilt += (this.targetTilt - this.tilt) * 0.15;
+        }
 
         this.x = clamp(this.x, 0, WORLD_WIDTH  - this.width);
         this.y = clamp(this.y, 0, WORLD_HEIGHT - this.height);
@@ -165,6 +212,7 @@ class Player {
                 if (this.velY > 0) {
                     this.y = p.y - this.height;
                     this.onGround = true;
+                    this.currentPlatform = p;
                 } else if (this.velY < 0) {
                     this.y = p.y + p.height;
                 }
@@ -204,12 +252,15 @@ class Player {
                 if (angleDeg < SLOPE_STEEP_ANGLE) {
                     this.onGround = true;
                     this.onSlope  = true;
+                    this.currentPlatform = p;
                     this.currentSlopeAngle   = angleDeg;
                     this.currentSlopeNormalX = nx;
                     this.currentSlopeNormalY = ny;
 
-                    const slopeSign = nx > 0 ? 1 : -1;
-                    this.targetTilt = slopeSign * angleDeg;
+                    if (!this.isTipping) {
+                        const slopeSign = nx > 0 ? 1 : -1;
+                        this.targetTilt = slopeSign * angleDeg;
+                    }
                 } else {
                     const slideDir = nx > 0 ? 1 : -1;
                     this.velX += slideDir * SLOPE_EJECT_SPEED;
@@ -224,6 +275,7 @@ class Player {
 
     draw(ctx) {
         let pivotX = this.x + this.width / 2;
+        
         if (this.onSlope || this.slopeCoyote > 0) {
             if (this.currentSlopeNormalX < 0) {
                 pivotX = this.x + this.width;
@@ -231,6 +283,12 @@ class Player {
                 pivotX = this.x;
             }
         }
+        
+        if (this.isTipping) {
+            if (this.tipVel > 0) pivotX = this.x + this.width;
+            else if (this.tipVel < 0) pivotX = this.x;
+        }
+        
         const pivotY = this.y + this.height;
 
         ctx.save();
