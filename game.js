@@ -152,6 +152,7 @@ class Player {
             this.slopeCoyote--;
         }
 
+        let tdir = 0;
         if (this.onGround && this.currentPlatform) {
             const p = this.currentPlatform;
             const cx = this.x + this.width / 2;
@@ -169,14 +170,14 @@ class Player {
             if (localX > p.width / 2) overhang = localX - p.width / 2;
             else if (localX < -p.width / 2) overhang = -p.width / 2 - localX;
 
-            if (overhang > 2) {
-                const tdir = localX > 0 ? 1 : -1;
-                this.tipVel += tdir * overhang * 0.002;
+            if (overhang > 0) {
+                tdir = localX > 0 ? 1 : -1;
+                this.tipVel += tdir * overhang * 0.005;
                 this.tipVel = clamp(this.tipVel, -0.3, 0.3);
                 this.isTipping = true;
             } else {
-                this.tipVel *= 0.85;
-                if (Math.abs(this.tipVel) < 0.01) this.isTipping = false;
+                this.tipVel = 0;
+                this.isTipping = false;
             }
 
             if (this.isTipping) {
@@ -185,12 +186,14 @@ class Player {
                     this.onGround = false;
                     this.onSlope = false;
                     this.isTipping = false;
+                    this.velY = Math.max(this.velY, 2);
+                    this.velX += tdir * 2;
                 }
             } else {
                 this.tilt += (this.targetTilt - this.tilt) * (this.onSlope ? 0.18 : 0.15);
             }
         } else {
-            this.tipVel *= 0.95;
+            this.tipVel = 0;
             this.isTipping = false;
             this.tilt += (this.targetTilt - this.tilt) * 0.15;
         }
@@ -275,21 +278,29 @@ class Player {
 
     draw(ctx) {
         let pivotX = this.x + this.width / 2;
-        
-        if (this.onSlope || this.slopeCoyote > 0) {
+        let pivotY = this.y + this.height;
+
+        if (this.isTipping && this.currentPlatform) {
+            const p = this.currentPlatform;
+            const bx = p.x + p.width / 2;
+            const by = p.y + p.height / 2;
+            const rad = p.rotation * Math.PI / 180;
+            const cos = Math.cos(rad), sin = Math.sin(rad);
+            const hw = p.width / 2, hh = p.height / 2;
+
+            const dir = this.tipVel > 0 ? 1 : -1;
+            const px = dir > 0 ? hw : -hw;
+            const py = -hh;
+
+            pivotX = bx + px * cos - py * sin;
+            pivotY = by + px * sin + py * cos;
+        } else if (this.onSlope || this.slopeCoyote > 0) {
             if (this.currentSlopeNormalX < 0) {
                 pivotX = this.x + this.width;
             } else if (this.currentSlopeNormalX > 0) {
                 pivotX = this.x;
             }
         }
-        
-        if (this.isTipping) {
-            if (this.tipVel > 0) pivotX = this.x + this.width;
-            else if (this.tipVel < 0) pivotX = this.x;
-        }
-        
-        const pivotY = this.y + this.height;
 
         ctx.save();
         ctx.translate(pivotX, pivotY);
