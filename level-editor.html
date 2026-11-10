@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Level Editor</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #111; color: #e0e0e0; }
+  #editor { display: flex; height: 100vh; }
+  #canvasWrap { flex: 1; position: relative; overflow: hidden; }
+  #canvas { display: block; }
+  #panel { width: 340px; background: #1a1a1a; padding: 14px; overflow-y: auto; border-left: 1px solid #333; }
+  #panel h2 { margin: 16px 0 8px; font-size: 12px; letter-spacing: 2px; color: #5aa0ff; }
+  #panel h2:first-child { margin-top: 0; }
+  #panel label { display: block; margin: 8px 0 4px; font-size: 11px; color: #999; letter-spacing: 1px; }
+  #panel input { width: 100%; padding: 6px 8px; background: #0a0a0a; color: #e0e0e0; border: 1px solid #333; font-family: inherit; font-size: 13px; }
+  #panel input:focus { outline: none; border-color: #5aa0ff; }
+  .row { display: flex; gap: 8px; }
+  .row > div { flex: 1; }
+  button { display: block; width: 100%; padding: 9px; margin: 6px 0; background: #2a2a2a; color: #e0e0e0; border: 1px solid #444; font-family: inherit; font-size: 11px; font-weight: bold; letter-spacing: 1px; cursor: pointer; transition: background .12s, border-color .12s; }
+  button:hover { background: #3a3a3a; border-color: #666; }
+  button.primary { background: #1e4a7a; border-color: #3b7dd8; color: #cfe8ff; }
+  button.primary:hover { background: #3b7dd8; }
+  button.danger { background: #4a1a1a; border-color: #833; color: #ffcaca; }
+  button.danger:hover { background: #a03030; }
+  #output { width: 100%; height: 160px; padding: 8px; background: #080808; color: #6f6; border: 1px solid #333; font-family: inherit; font-size: 10px; resize: vertical; margin-top: 8px; }
+  #status { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.75); border: 1px solid #333; padding: 5px 10px; font-size: 11px; color: #9c9; pointer-events: none; }
+  .hint { font-size: 10px; color: #666; line-height: 1.6; margin-top: 8px; border-top: 1px solid #2a2a2a; padding-top: 8px; }
+  .hint b { color: #888; }
+  .prop-group { transition: opacity .15s; }
+  .prop-group.disabled { opacity: 0.3; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="editor">
+  <div id="canvasWrap">
+    <canvas id="canvas"></canvas>
+    <div id="status">Ready</div>
+  </div>
+  <div id="panel">
+    <h2>ACTIONS</h2>
+    <button id="btnCreate" class="primary">+ CREATE BLOCK</button>
+    <button id="btnDelete" class="danger">DELETE SELECTED</button>
+    <button id="btnFit">FIT VIEW</button>
+
+    <h2>PROPERTIES</h2>
+    <div class="prop-group disabled" id="propGroup">
+      <div class="row">
+        <div><label>X</label><input type="number" id="inpX" step="1"></div>
+        <div><label>Y</label><input type="number" id="inpY" step="1"></div>
+      </div>
+      <div class="row">
+        <div><label>WIDTH</label><input type="number" id="inpW" step="1"></div>
+        <div><label>HEIGHT</label><input type="number" id="inpH" step="1"></div>
+      </div>
+      <label>ROTATION (DEG)</label>
+      <input type="number" id="inpR" step="1">
+    </div>
+
+    <h2>EXPORT</h2>
+    <button id="btnExport">EXPORT BLOCKS ARRAY</button>
+    <button id="btnCopy" class="primary">SAVE TO CLIPBOARD</button>
+    <textarea id="output" readonly placeholder="Press EXPORT to generate..."></textarea>
+
+    <div class="hint">
+      <b>Drag:</b> move block<br>
+      <b>Handles:</b> resize<br>
+      <b>Top knob:</b> rotate<br>
+      <b>Wheel:</b> zoom<br>
+      <b>Right/Middle/SPACE+drag:</b> pan<br>
+      <b>SHIFT+move:</b> snap 10<br>
+      <b>SHIFT+rotate:</b> snap 15&deg;<br>
+      <b>Arrows:</b> nudge &middot; <b>DEL:</b> delete &middot; <b>ESC:</b> deselect &middot; <b>C:</b> create
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+
+const WORLD_W = 9600;
+const WORLD_H = 5400;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+const propGroup = document.getElementById('propGroup');
+const outputEl = document.getElementById('output');
+
+const cam = { x: 0, y: 0, zoom: 0.1 };
+
+let blocks = [
+  { x: 0, y: WORLD_H - 60, width: WORLD_W, height: 60, rotation: 0 }
+];
+let selected = null;
+let dragState = null;
+let creating = false;
+
+let mouseScreen = { x: -1, y: -1 };
+let shiftDown = false;
+let spaceDown = false;
+
+function resizeCanvas() {
+  const wrap = document.getElementById('canvasWrap');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, wrap.clientWidth * dpr);
+  canvas.height = Math.max(1, wrap.clientHeight * dpr);
+  canvas.style.width = wrap.clientWidth + 'px';
+  canvas.style.height = wrap.clientHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  render();
+}
+
+function worldToScreen(wx, wy) {
+  return { x: (wx - cam.x) * cam.zoom, y: (wy - cam.y) * cam.zoom };
+}
+function screenToWorld(sx, sy) {
+  return { x: sx / cam.zoom + cam.x, y: sy / cam.zoom + cam.y };
+}
+
+function fitView() {
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  const margin = 40;
+  cam.zoom = Math.min((w - margin * 2) / WORLD_W, (h - margin * 2) / WORLD_H);
+  cam.x = -margin / cam.zoom;
+  cam.y = -margin / cam.zoom;
+  render();
+}
+
+function pointInBlock(px, py, b) {
+  const cx = b.x + b.width / 2;
+  const cy = b.y + b.height / 2;
+  const rad = -b.rotation * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const dx = px - cx, dy = py - cy;
+  const lx = dx * cos - dy * sin + cx;
+  const ly = dx * sin + dy * cos + cy;
+  return lx >= b.x && lx <= b.x + b.width &&
+         ly >= b.y && ly <= b.y + b.height;
+}
+
+function getHandles(b) {
+  const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+  const rad = b.rotation * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const hw = b.width / 2, hh = b.height / 2;
+  const local = [
+    { lx: -hw, ly: -hh, id: 'nw' },
+    { lx:  hw, ly: -hh, id: 'ne' },
+    { lx:  hw, ly:  hh, id: 'se' },
+    { lx: -hw, ly:  hh, id: 'sw' },
+    { lx:   0, ly: -hh, id: 'n'  },
+    { lx:  hw, ly:   0, id: 'e'  },
+    { lx:   0, ly:  hh, id: 's'  },
+    { lx: -hw, ly:   0, id: 'w'  }
+  ];
+  return local.map(h => ({
+    id: h.id,
+    x: cx + h.lx * cos - h.ly * sin,
+    y: cy + h.lx * sin + h.ly * cos
+  }));
+}
+
+function getRotateHandle(b) {
+  const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+  const rad = b.rotation * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const hh = b.height / 2;
+  const offset = 25 / cam.zoom;
+  const lx = 0, ly = -hh - offset;
+  return { x: cx + lx * cos - ly * sin, y: cy + lx * sin + ly * cos };
+}
+
+function getTopCenter(b) {
+  const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+  const rad = b.rotation * Math.PI / 180;
+  const sin = Math.sin(rad), cos = Math.cos(rad);
+  const hh = b.height / 2;
+  return { x: cx + hh * sin, y: cy - hh * cos };
+}
+
+function render() {
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.fillStyle = '#0f0f0f';
+  ctx.fillRect(0, 0, w, h);
+
+  drawGrid();
+
+  for (const b of blocks) {
+    drawBlock(b, b === selected);
+  }
+
+  if (selected) drawSelection(selected);
+}
+
+function drawGrid() {
+  const tl = worldToScreen(0, 0);
+  const br = worldToScreen(WORLD_W, WORLD_H);
+  const x0 = Math.max(tl.x, 0);
+  const x1 = Math.min(br.x, canvas.clientWidth);
+  const y0 = Math.max(tl.y, 0);
+  const y1 = Math.min(br.y, canvas.clientHeight);
+
+  let step = 240;
+  while (step * cam.zoom < 8) step *= 2;
+
+  ctx.strokeStyle = '#1c1c1c';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const startWorldX = Math.floor(cam.x / step) * step;
+  const endWorldX = cam.x + canvas.clientWidth / cam.zoom;
+  for (let wx = startWorldX; wx <= endWorldX; wx += step) {
+    if (wx < 0 || wx > WORLD_W) continue;
+    const s = worldToScreen(wx, 0);
+    ctx.moveTo(s.x, y0); ctx.lineTo(s.x, y1);
+  }
+  const startWorldY = Math.floor(cam.y / step) * step;
+  const endWorldY = cam.y + canvas.clientHeight / cam.zoom;
+  for (let wy = startWorldY; wy <= endWorldY; wy += step) {
+    if (wy < 0 || wy > WORLD_H) continue;
+    const s = worldToScreen(0, wy);
+    ctx.moveTo(x0, s.y); ctx.lineTo(x1, s.y);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = '#2e2e2e';
+  ctx.beginPath();
+  for (let wx = 0; wx <= WORLD_W; wx += 1920) {
+    const s = worldToScreen(wx, 0);
+    if (s.x < x0 - 1 || s.x > x1 + 1) continue;
+    ctx.moveTo(s.x, y0); ctx.lineTo(s.x, y1);
+  }
+  for (let wy = 0; wy <= WORLD_H; wy += 1080) {
+    const s = worldToScreen(0, wy);
+    if (s.y < y0 - 1 || s.y > y1 + 1) continue;
+    ctx.moveTo(x0, s.y); ctx.lineTo(x1, s.y);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = '#4a4a4a';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+}
+
+function drawBlock(b, isSelected) {
+  const cx = b.x + b.width / 2;
+  const cy = b.y + b.height / 2;
+  const c = worldToScreen(cx, cy);
+
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.rotate(b.rotation * Math.PI / 180);
+
+  const w = b.width * cam.zoom;
+  const h = b.height * cam.zoom;
+
+  ctx.fillStyle = isSelected ? '#5aa0ff' : '#3b7dd8';
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+
+  ctx.strokeStyle = isSelected ? '#fff' : '#1a4a8a';
+  ctx.lineWidth = isSelected ? 2 : 1;
+  ctx.strokeRect(-w / 2, -h / 2, w, h);
+
+  if (w > 4 && h > 4) {
+    ctx.fillStyle = 'rgba(140,200,255,0.5)';
+    const th = Math.min(8 * cam.zoom, h * 0.15);
+    if (th > 0.5) ctx.fillRect(-w / 2, -h / 2, w, th);
+  }
+
+  ctx.restore();
+}
+
+function drawSelection(b) {
+  const handles = getHandles(b);
+  ctx.fillStyle = '#fff';
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+  for (const hd of handles) {
+    const s = worldToScreen(hd.x, hd.y);
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  const rh = getRotateHandle(b);
+  const rs = worldToScreen(rh.x, rh.y);
+  ctx.beginPath();
+  ctx.arc(rs.x, rs.y, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffb020';
+  ctx.fill();
+  ctx.stroke();
+
+  const tc = getTopCenter(b);
+  const tcs = worldToScreen(tc.x, tc.y);
+  ctx.strokeStyle = 'rgba(255,176,32,0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(tcs.x, tcs.y);
+  ctx.lineTo(rs.x, rs.y);
+  ctx.stroke();
+}
+
+function updatePropsUI() {
+  if (selected) {
+    propGroup.classList.remove('disabled');
+    document.getElementById('inpX').value = Math.round(selected.x);
+    document.getElementById('inpY').value = Math.round(selected.y);
+    document.getElementById('inpW').value = Math.round(selected.width);
+    document.getElementById('inpH').value = Math.round(selected.height);
+    document.getElementById('inpR').value = selected.rotation;
+  } else {
+    propGroup.classList.add('disabled');
+    ['inpX','inpY','inpW','inpH','inpR'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+  }
+}
+
+function bindProp(id, field) {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    if (!selected) return;
+    const v = parseFloat(el.value);
+    if (!isNaN(v)) {
+      selected[field] = v;
+      render();
+    }
+  });
+}
+bindProp('inpX', 'x');
+bindProp('inpY', 'y');
+bindProp('inpW', 'width');
+bindProp('inpH', 'height');
+bindProp('inpR', 'rotation');
+
+function startMove(b, w) {
+  dragState = {
+    type: 'move',
+    block: b,
+    startMouse: { x: w.x, y: w.y },
+    startBlock: { x: b.x, y: b.y, width: b.width, height: b.height, rotation: b.rotation }
+  };
+}
+
+function startResize(b, handleId, w) {
+  dragState = {
+    type: 'resize',
+    block: b,
+    handle: handleId,
+    startMouse: { x: w.x, y: w.y },
+    startBlock: { x: b.x, y: b.y, width: b.width, height: b.height, rotation: b.rotation }
+  };
+}
+
+function startRotate(b, w) {
+  const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+  dragState = {
+    type: 'rotate',
+    block: b,
+    cx, cy,
+    startAngle: Math.atan2(w.y - cy, w.x - cx),
+    startRotation: b.rotation
+  };
+}
+
+function onMouseDown(e) {
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+
+  if (e.button === 1 || e.button === 2 || (e.button === 0 && spaceDown)) {
+    e.preventDefault();
+    dragState = {
+      type: 'pan',
+      startScreen: { x: e.clientX, y: e.clientY },
+      startCam: { x: cam.x, y: cam.y }
+    };
+    return;
+  }
+  if (e.button !== 0) return;
+
+  const w = screenToWorld(sx, sy);
+
+  if (creating) {
+    creating = false;
+    const b = { x: w.x, y: w.y, width: 0, height: 0, rotation: 0 };
+    blocks.push(b);
+    selected = b;
+    dragState = {
+      type: 'create',
+      block: b,
+      startWorld: { x: w.x, y: w.y }
+    };
+    updatePropsUI();
+    setStatus('Drag to size the new block');
+    return;
+  }
+
+  if (selected) {
+    const rh = getRotateHandle(selected);
+    const rhs = worldToScreen(rh.x, rh.y);
+    if (Math.hypot(rhs.x - sx, rhs.y - sy) < 12) {
+      startRotate(selected, w);
+      return;
+    }
+
+    const handles = getHandles(selected);
+    for (const hd of handles) {
+      const hs = worldToScreen(hd.x, hd.y);
+      if (Math.hypot(hs.x - sx, hs.y - sy) < 8) {
+        startResize(selected, hd.id, w);
+        return;
+      }
+    }
+  }
+
+  let hit = null;
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    if (pointInBlock(w.x, w.y, blocks[i])) { hit = blocks[i]; break; }
+  }
+
+  if (hit) {
+    selected = hit;
+    startMove(hit, w);
+    updatePropsUI();
+  } else {
+    selected = null;
+    updatePropsUI();
+  }
+  render();
+}
+
+function onMouseMove(e) {
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  mouseScreen.x = sx;
+  mouseScreen.y = sy;
+
+  if (!dragState) return;
+
+  const w = screenToWorld(sx, sy);
+
+  if (dragState.type === 'pan') {
+    cam.x = dragState.startCam.x - (e.clientX - dragState.startScreen.x) / cam.zoom;
+    cam.y = dragState.startCam.y - (e.clientY - dragState.startScreen.y) / cam.zoom;
+  } else if (dragState.type === 'move') {
+    const b = dragState.block;
+    const s = dragState.startBlock;
+    b.x = s.x + (w.x - dragState.startMouse.x);
+    b.y = s.y + (w.y - dragState.startMouse.y);
+    if (shiftDown) {
+      b.x = Math.round(b.x / 10) * 10;
+      b.y = Math.round(b.y / 10) * 10;
+    }
+    updatePropsUI();
+  } else if (dragState.type === 'resize') {
+    doResize(w);
+    updatePropsUI();
+  } else if (dragState.type === 'rotate') {
+    doRotate(w);
+    updatePropsUI();
+  } else if (dragState.type === 'create') {
+    const b = dragState.block;
+    const s = dragState.startWorld;
+    b.x = Math.min(s.x, w.x);
+    b.y = Math.min(s.y, w.y);
+    b.width = Math.abs(w.x - s.x);
+    b.height = Math.abs(w.y - s.y);
+    updatePropsUI();
+  }
+  render();
+}
+
+function doResize(w) {
+  const b = dragState.block;
+  const s = dragState.startBlock;
+  const h = dragState.handle;
+  const sm = dragState.startMouse;
+
+  const dxWorld = w.x - sm.x;
+  const dyWorld = w.y - sm.y;
+
+  const rad = s.rotation * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const dLocalX = dxWorld * cos + dyWorld * sin;
+  const dLocalY = -dxWorld * sin + dyWorld * cos;
+
+  const startHw = s.width / 2;
+  const startHh = s.height / 2;
+
+  let left = -startHw, right = startHw, top = -startHh, bottom = startHh;
+  if (h.includes('w')) left += dLocalX;
+  if (h.includes('e')) right += dLocalX;
+  if (h.includes('n')) top += dLocalY;
+  if (h.includes('s')) bottom += dLocalY;
+
+  const minSize = 4;
+  if (right - left < minSize) {
+    if (h.includes('w')) left = right - minSize;
+    else right = left + minSize;
+  }
+  if (bottom - top < minSize) {
+    if (h.includes('n')) top = bottom - minSize;
+    else bottom = top + minSize;
+  }
+
+  const newLcx = (left + right) / 2;
+  const newLcy = (top + bottom) / 2;
+  const newHw = (right - left) / 2;
+  const newHh = (bottom - top) / 2;
+
+  const startCx = s.x + s.width / 2;
+  const startCy = s.y + s.height / 2;
+  const newCx = startCx + newLcx * cos - newLcy * sin;
+  const newCy = startCy + newLcx * sin + newLcy * cos;
+
+  b.x = newCx - newHw;
+  b.y = newCy - newHh;
+  b.width = newHw * 2;
+  b.height = newHh * 2;
+  b.rotation = s.rotation;
+}
+
+function doRotate(w) {
+  const b = dragState.block;
+  const a = Math.atan2(w.y - dragState.cy, w.x - dragState.cx);
+  let delta = a - dragState.startAngle;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  let rot = dragState.startRotation + delta * 180 / Math.PI;
+  if (shiftDown) rot = Math.round(rot / 15) * 15;
+  while (rot > 180) rot -= 360;
+  while (rot < -180) rot += 360;
+  b.rotation = Math.round(rot * 10) / 10;
+}
+
+function onMouseUp() {
+  if (dragState && dragState.type === 'create') {
+    const b = dragState.block;
+    if (b.width < 4 || b.height < 4) {
+      b.width = 200;
+      b.height = 200;
+      b.x = dragState.startWorld.x - 100;
+      b.y = dragState.startWorld.y - 100;
+    }
+    setStatus('Block created');
+    updatePropsUI();
+  }
+  dragState = null;
+  render();
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const before = screenToWorld(sx, sy);
+  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+  cam.zoom = Math.max(0.02, Math.min(4, cam.zoom * factor));
+  const after = screenToWorld(sx, sy);
+  cam.x += before.x - after.x;
+  cam.y += before.y - after.y;
+  render();
+}
+
+document.getElementById('btnCreate').addEventListener('click', () => {
+  creating = true;
+  setStatus('Click-drag on canvas to create a block');
+});
+
+document.getElementById('btnDelete').addEventListener('click', () => {
+  if (!selected) return;
+  const i = blocks.indexOf(selected);
+  if (i >= 0) {
+    blocks.splice(i, 1);
+    selected = null;
+    updatePropsUI();
+    render();
+    setStatus('Block deleted');
+  }
+});
+
+document.getElementById('btnFit').addEventListener('click', () => {
+  fitView();
+  setStatus('View fitted');
+});
+
+document.getElementById('btnExport').addEventListener('click', () => {
+  outputEl.value = generateExport();
+  setStatus('Exported');
+});
+
+document.getElementById('btnCopy').addEventListener('click', async () => {
+  const text = generateExport();
+  outputEl.value = text;
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus('Copied to clipboard');
+  } catch (err) {
+    outputEl.select();
+    try {
+      document.execCommand('copy');
+      setStatus('Copied (fallback)');
+    } catch (e2) {
+      setStatus('Copy failed — select and copy manually');
+    }
+  }
+});
+
+function generateExport() {
+  let s = 'blocks: [\n';
+  for (const b of blocks) {
+    s += '    { x: ' + Math.round(b.x) +
+         ', y: ' + Math.round(b.y) +
+         ', width: ' + Math.round(b.width) +
+         ', height: ' + Math.round(b.height) +
+         ', rotation: ' + (Math.round(b.rotation * 10) / 10) + ' },\n';
+  }
+  s += ']';
+  return s;
+}
+
+function setStatus(t) {
+  statusEl.textContent = t;
+  clearTimeout(setStatus._t);
+  setStatus._t = setTimeout(() => { statusEl.textContent = 'Ready'; }, 2500);
+}
+
+document.addEventListener('keydown', e => {
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+
+  if (e.key === 'Shift') shiftDown = true;
+
+  if (e.key === ' ') {
+    e.preventDefault();
+    spaceDown = true;
+    return;
+  }
+
+  if (e.key === 'Escape') {
+    selected = null;
+    creating = false;
+    updatePropsUI();
+    render();
+    return;
+  }
+
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (selected) {
+      const i = blocks.indexOf(selected);
+      if (i >= 0) blocks.splice(i, 1);
+      selected = null;
+      updatePropsUI();
+      render();
+      setStatus('Block deleted');
+    }
+    e.preventDefault();
+    return;
+  }
+
+  if (e.key === 'c' || e.key === 'C') {
+    creating = true;
+    setStatus('Click-drag on canvas to create a block');
+    return;
+  }
+
+  if (selected) {
+    const step = e.shiftKey ? 10 : 1;
+    let moved = false;
+    if (e.key === 'ArrowLeft')  { selected.x -= step; moved = true; e.preventDefault(); }
+    if (e.key === 'ArrowRight') { selected.x += step; moved = true; e.preventDefault(); }
+    if (e.key === 'ArrowUp')    { selected.y -= step; moved = true; e.preventDefault(); }
+    if (e.key === 'ArrowDown')  { selected.y += step; moved = true; e.preventDefault(); }
+    if (moved) {
+      updatePropsUI();
+      render();
+    }
+  }
+});
+
+document.addEventListener('keyup', e => {
+  if (e.key === 'Shift') shiftDown = false;
+  if (e.key === ' ') spaceDown = false;
+});
+
+window.addEventListener('blur', () => {
+  shiftDown = false;
+  spaceDown = false;
+});
+
+canvas.addEventListener('mousedown', onMouseDown);
+document.addEventListener('mousemove', onMouseMove);
+document.addEventListener('mouseup', onMouseUp);
+canvas.addEventListener('wheel', onWheel, { passive: false });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('load', () => {
+  resizeCanvas();
+  fitView();
+  updatePropsUI();
+  setStatus('Ready — press C or + CREATE to add a block');
+});
+</script>
+</body>
+</html>
