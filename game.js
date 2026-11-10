@@ -3,13 +3,11 @@ const SCREEN_WIDTH  = 1920;
 const SCREEN_HEIGHT = 1080;
 const WORLD_SCREENS_X = 5;
 const WORLD_SCREENS_Y = 5;
-const WORLD_WIDTH  = SCREEN_WIDTH  * WORLD_SCREENS_X;   // 9600
-const WORLD_HEIGHT = SCREEN_HEIGHT * WORLD_SCREENS_Y;   // 5400
+const WORLD_WIDTH  = SCREEN_WIDTH  * WORLD_SCREENS_X;
+const WORLD_HEIGHT = SCREEN_HEIGHT * WORLD_SCREENS_Y;
 
 const VIEW_WIDTH  = SCREEN_WIDTH;
 const VIEW_HEIGHT = SCREEN_HEIGHT;
-
-const tickLength = 20; // 50 TPS
 
 // ====== PHYSICS CONSTANTS ======
 const GRAVITY = 0.9;
@@ -18,9 +16,126 @@ const MOVE_SPEED = 8;
 const JUMP_HEIGHT = 222;
 const JUMP_VELOCITY = Math.sqrt(2 * GRAVITY * JUMP_HEIGHT);
 
-// ====== GAME STATE ======
+// ====== LEVEL ======
+const platforms = [];
+const GROUND_HEIGHT = 60;
+
+const level = [
+    {
+        blocks: [
+            { x: 0, y: WORLD_HEIGHT - GROUND_HEIGHT, width: WORLD_WIDTH, height: GROUND_HEIGHT, rotation: 0 },
+            { x: 0, y: 5340, width: 9600, height: 60, rotation: 0 },
+            { x: 2075, y: 4308, width: 1271, height: 482, rotation: 25.4 },
+            { x: 4382, y: 4942, width: 1433, height: 209, rotation: 0 },
+            { x: 4807, y: 5121, width: 22, height: 75, rotation: 0 },
+            { x: 6375, y: 4703, width: 1000, height: 149, rotation: 0 },
+            { x: 8010, y: 4472, width: 1224, height: 164, rotation: 0 }
+        ]
+    }
+];
+
+function buildLevel() {
+    platforms.length = 0;
+
+    for (const b of level[0].blocks) {
+        platforms.push({ x: b.x, y: b.y, width: b.width, height: b.height });
+    }
+}
+
+// ====== TICK ENGINE VARS ======
+const tickLength = 20;
 let frameAccumulator = 0;
 let lastTimestamp = 0;
+
+// ====== PLAYER CLASS ======
+class Player {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width  = 80;
+        this.height = 80;
+        this.velX = 0;
+        this.velY = 0;
+        this.speed = MOVE_SPEED;
+
+        this.onGround = false;
+        this.facing   = 1;
+    }
+
+    update() {
+        let dir = 0;
+        if (keys.a && !keys.d) dir = -1;
+        else if (keys.d && !keys.a) dir = 1;
+
+        this.velX = dir * this.speed;
+        if (dir !== 0) this.facing = dir;
+
+        if (keys.space && this.onGround) {
+            this.velY     = -JUMP_VELOCITY;
+            this.onGround = false;
+        }
+
+        this.velY = Math.min(this.velY + GRAVITY, MAX_FALL_SPEED);
+
+        this.x += this.velX;
+        this.collide(0);
+
+        this.onGround = false;
+        this.y += this.velY;
+        this.collide(1);
+
+        this.x = clamp(this.x, 0, WORLD_WIDTH  - this.width);
+        this.y = clamp(this.y, 0, WORLD_HEIGHT - this.height);
+    }
+
+    collide(axis) {
+        for (const p of platforms) {
+            if (!isColliding(this, p)) continue;
+
+            if (axis === 0) {
+                if (this.velX > 0)      this.x = p.x - this.width;
+                else if (this.velX < 0) this.x = p.x + p.width;
+                    this.velX = 0;
+            } else {
+                if (this.velY > 0) {
+                    this.y = p.y - this.height;
+                    this.onGround = true;
+                } else if (this.velY < 0) {
+                    this.y = p.y + p.height;
+                }
+                this.velY = 0;
+            }
+        }
+    }
+
+    draw(ctx) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+
+        const eyeSize = this.width * 0.14;
+        const eyeY    = this.y + this.height * 0.28;
+        const cx      = this.x + this.width / 2 + this.facing * this.width * 0.12;
+
+        ctx.fillStyle = "#1a1a1a";
+        ctx.fillRect(cx - this.width * 0.22, eyeY, eyeSize, eyeSize);
+        ctx.fillRect(cx + this.width * 0.22 - eyeSize, eyeY, eyeSize, eyeSize);
+    }
+}
+
+// ====== CAMERA ======
+const camera = {
+    x: 0,
+    y: 0,
+    follow(target) {
+        const targetX = target.x + target.width  / 2 - VIEW_WIDTH  / 2;
+        const targetY = target.y + target.height / 2 - VIEW_HEIGHT / 2;
+
+        this.x = clamp(targetX, 0, WORLD_WIDTH  - VIEW_WIDTH);
+        this.y = clamp(targetY, 0, WORLD_HEIGHT - VIEW_HEIGHT);
+    }
+};
+
+// ====== GLOBAL VARIABLES ======
 let playerObj;
 let gameStarted = false;
 let isPaused = false;
@@ -39,120 +154,24 @@ function isColliding(a, b) {
            a.y + a.height > b.y;
 }
 
-// ====== LEVEL ======
-const platforms = [];
-const GROUND_HEIGHT = 60;
+// ====== TRANSITIONS ======
+function startGame() {
+    gameStarted = true;
+    isPaused = false;
 
-function buildLevel() {
-    platforms.length = 0;
+    const spawnX = 60;
+    const spawnY = WORLD_HEIGHT - GROUND_HEIGHT - 80;
 
-    const groundY = WORLD_HEIGHT - GROUND_HEIGHT;
-
-    // Ground slab spanning the entire world.
-    platforms.push({ x: 0, y: groundY, width: WORLD_WIDTH, height: GROUND_HEIGHT });
-    
-    // All blue zig-zag ledges have been removed.
+    playerObj = new Player(spawnX, spawnY);
+    camera.follow(playerObj);
 }
 
-// ====== PLAYER CLASS ======
-class Player {
-    constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.width  = 80;
-        this.height = 80;
-        this.velX = 0;
-        this.velY = 0;
-        this.speed = MOVE_SPEED;
-
-        this.onGround = false;
-        this.facing   = 1;
-    }
-
-    // ------ Update Player ------
-    update() {
-        // ------ Horizontal Input ------
-        let dir = 0;
-        if (keys.a && !keys.d) dir = -1;
-        else if (keys.d && !keys.a) dir = 1;
-
-        this.velX = dir * this.speed;
-        if (dir !== 0) this.facing = dir;
-
-        // ------ Jump Logic ------
-        // Holding space allows for continuous bunny hopping at a fixed height
-        if (keys.space && this.onGround) {
-            this.velY     = -JUMP_VELOCITY;
-            this.onGround = false;
-        }
-
-        // ------ Gravity Engine ------
-        this.velY = Math.min(this.velY + GRAVITY, MAX_FALL_SPEED);
-        
-        this.x += this.velX;
-        this.collide(0);
-
-        this.onGround = false;
-        this.y += this.velY;
-        this.collide(1);
-
-        // ------ Keep Player Inside Canvas ------
-        this.x = clamp(this.x, 0, WORLD_WIDTH  - this.width);
-        this.y = clamp(this.y, 0, WORLD_HEIGHT - this.height);
-    }
-
-    // ------ Collision Engine ------
-    collide(axis) {
-        for (const p of platforms) {
-            if (!isColliding(this, p)) continue;
-
-            if (axis === 0) {                       // Horizontal
-                if (this.velX > 0)      this.x = p.x - this.width;
-                else if (this.velX < 0) this.x = p.x + p.width;
-                    this.velX = 0;
-            } else {                                // Vertical
-                if (this.velY > 0) {                // Falling -> landed
-                    this.y = p.y - this.height;
-                    this.onGround = true;
-                } else if (this.velY < 0) {         // Rising -> bonk
-                    this.y = p.y + p.height;
-                }
-                this.velY = 0;
-            }
-        }
-    }
-
-    // ------ Draw Player ------
-    draw(ctx) {
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(this.x, this.y, this.width, this.height);
-
-        // Little eyes so you can tell which way you're facing
-        const eyeSize = this.width * 0.14;
-        const eyeY    = this.y + this.height * 0.28;
-        const cx      = this.x + this.width / 2 + this.facing * this.width * 0.12;
-
-        ctx.fillStyle = "#1a1a1a";
-        ctx.fillRect(cx - this.width * 0.22, eyeY, eyeSize, eyeSize);
-        ctx.fillRect(cx + this.width * 0.22 - eyeSize, eyeY, eyeSize, eyeSize);
-    }
+function init() {
+    gameArea.setup();
+    startGame();
 }
 
-// ====== CAMERA ======
-const camera = {
-    x: 0,
-    y: 0,
-    // ------ Follow Player ------
-    follow(target) {
-        const targetX = target.x + target.width  / 2 - VIEW_WIDTH  / 2;
-        const targetY = target.y + target.height / 2 - VIEW_HEIGHT / 2;
-
-        this.x = clamp(targetX, 0, WORLD_WIDTH  - VIEW_WIDTH);
-        this.y = clamp(targetY, 0, WORLD_HEIGHT - VIEW_HEIGHT);
-    }
-};
-
-// ====== GAME AREA & CANVAS ======
+// ====== GAME AREA ENGINE ======
 const gameArea = {
     canvas: document.getElementById("gameCanvas"),
     width: VIEW_WIDTH,
@@ -161,7 +180,6 @@ const gameArea = {
     offsetX: 0,
     offsetY: 0,
 
-    // ------ Setup ------
     setup() {
         this.context = this.canvas.getContext("2d");
         this.resize();
@@ -170,7 +188,6 @@ const gameArea = {
         requestAnimationFrame(engineLoop);
     },
 
-    // ------ GameArea Resize ------
     resize() {
         const dpr  = window.devicePixelRatio || 1;
         const cssW = window.innerWidth;
@@ -181,7 +198,6 @@ const gameArea = {
         this.canvas.width  = Math.round(cssW * dpr);
         this.canvas.height = Math.round(cssH * dpr);
 
-        // Fit one screen worth of world into the window (letterboxed).
         this.scale = Math.min(
             this.canvas.width  / this.width,
             this.canvas.height / this.height
@@ -205,7 +221,6 @@ function renderGame() {
     const ctx = gameArea.context;
     if (!ctx) return;
 
-    // Clear the whole device-sized canvas (letterbox bars)
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, gameArea.canvas.width, gameArea.canvas.height);
@@ -216,8 +231,7 @@ function renderGame() {
 
     ctx.save();
     ctx.setTransform(s, 0, 0, s, gameArea.offsetX - camera.x * s, gameArea.offsetY - camera.y * s);
-    
-    // Clip to the viewport so nothing bleeds into the letterbox bars
+
     ctx.beginPath();
     ctx.rect(camera.x, camera.y, VIEW_WIDTH, VIEW_HEIGHT);
     ctx.clip();
@@ -237,11 +251,9 @@ function drawWorld(ctx) {
     const viewRight  = camera.x + VIEW_WIDTH;
     const viewBottom = camera.y + VIEW_HEIGHT;
 
-    // Backdrop (only the visible slice).
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(camera.x, camera.y, VIEW_WIDTH, VIEW_HEIGHT);
 
-    // ------ Subtle Grid ------
     const GRID = 240;
     ctx.strokeStyle = "#242424";
     ctx.lineWidth = 2;
@@ -256,7 +268,6 @@ function drawWorld(ctx) {
     }
     ctx.stroke();
 
-    // Screen boundaries — makes the 5x5 layout readable while scrolling.
     ctx.strokeStyle = "#3a3a3a";
     ctx.lineWidth = 4;
     ctx.beginPath();
@@ -270,7 +281,6 @@ function drawWorld(ctx) {
     }
     ctx.stroke();
 
-    // ------ Platforms (Culled) ------
     for (const p of platforms) {
         if (p.x + p.width  < camera.x || p.x > viewRight)  continue;
         if (p.y + p.height < camera.y || p.y > viewBottom) continue;
@@ -286,40 +296,6 @@ function drawWorld(ctx) {
 function drawHud(ctx) {
     ctx.textBaseline = "top";
 
-    // Top-left HUD text has been removed.
-
-    // ------ Minimap Of The World ------
-    /* const mmW = 240;
-    const mmH = 135;
-    const mmX = VIEW_WIDTH  - mmW - 30;
-    const mmY = 30;
-    const kx  = mmW / WORLD_WIDTH;
-    const ky  = mmH / WORLD_HEIGHT;
-
-    ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
-    ctx.fillRect(mmX, mmY, mmW, mmH);
-
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(mmX, mmY, mmW, mmH);
-
-    // ------ Camera Window ------
-    ctx.strokeStyle = "rgba(90, 160, 255, 0.9)";
-    ctx.strokeRect(
-        mmX + camera.x * kx,
-        mmY + camera.y * ky,
-        VIEW_WIDTH  * kx,
-        VIEW_HEIGHT * ky
-    );
-
-    // ------ Player Blip ------
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(
-        mmX + playerObj.x * kx - 2,
-        mmY + playerObj.y * ky - 2,
-        5, 5
-    ); */
-
     if (isPaused) {
         ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
         ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
@@ -333,13 +309,13 @@ function drawHud(ctx) {
     }
 }
 
-// ====== MAIN LOOP ======
+// ====== ENGINE LOOP ======
 function engineLoop(currentTime) {
     let deltaTime = currentTime - lastTimestamp;
     lastTimestamp = currentTime;
 
     if (!Number.isFinite(deltaTime) || deltaTime < 0) deltaTime = 0;
-    if (deltaTime > 250) deltaTime = 250;          // Tab was backgrounded
+    if (deltaTime > 250) deltaTime = 250;
 
     frameAccumulator += deltaTime;
 
@@ -349,30 +325,13 @@ function engineLoop(currentTime) {
         frameAccumulator -= tickLength;
         steps++;
     }
-    if (steps === 10) frameAccumulator = 0;        // Don't build up a debt
+    if (steps === 10) frameAccumulator = 0;
 
     renderGame();
     requestAnimationFrame(engineLoop);
 }
 
-// ====== STARTUP ======
-function startGame() {
-    gameStarted = true;
-    isPaused = false;
-
-    const spawnX = 60;                                        // Bottom-left
-    const spawnY = WORLD_HEIGHT - GROUND_HEIGHT - 80;         // Standing on the ground
-
-    playerObj = new Player(spawnX, spawnY);
-    camera.follow(playerObj);
-}
-
-function init() {
-    gameArea.setup();
-    startGame();
-}
-
-// ====== INPUT ======
+// ====== KEYBOARD LISTENERS ======
 function normalizeKey(e) {
     const k = e.key.toLowerCase();
     if (k === " " || k === "spacebar") return "space";
@@ -401,7 +360,6 @@ document.addEventListener("keyup", e => {
     keys[key] = false;
 });
 
-// Release everything if the window loses focus (avoids stuck keys).
 window.addEventListener("blur", () => {
     for (const k in keys) keys[k] = false;
 });
