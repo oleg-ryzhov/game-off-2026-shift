@@ -24,15 +24,9 @@ const level = [
         blocks: [
             { x: 0, y: WORLD_HEIGHT - 60, width: WORLD_WIDTH, height: 60, rotation: 0 },
             { x: 0, y: 5340, width: 9600, height: 60, rotation: 0 },
-            { x: 460, y: 5180, width: 193, height: 43, rotation: 0 },
-            { x: 850, y: 5070, width: 240, height: 45, rotation: 0 },
-            { x: 1360, y: 4970, width: 240, height: 45, rotation: 0 },
-            { x: 1610, y: 4820, width: 240, height: 45, rotation: 0 },
-            { x: 1370, y: 4630, width: 240, height: 45, rotation: 0 },
-            { x: 1610, y: 4440, width: 240, height: 45, rotation: 0 },
-            { x: 1120, y: 4280, width: 240, height: 45, rotation: 0 },
-            { x: 590, y: 4180, width: 240, height: 45, rotation: 0 },
-            { x: 70, y: 4130, width: 240, height: 45, rotation: 0 },
+            { x: 270, y: 5170, width: 118, height: 30, rotation: 0 },
+            { x: 550, y: 5070, width: 118, height: 30, rotation: 0 },
+            { x: 860, y: 5000, width: 140, height: 34, rotation: -18 },
         ]
     }
 ];
