@@ -18,16 +18,11 @@ const JUMP_VELOCITY = Math.sqrt(2 * GRAVITY * JUMP_HEIGHT);
 
 // ====== LEVEL ======
 const platforms = [];
-const GROUND_HEIGHT = 60;
 
 const level = [
     {
         blocks: [
-            { x: 0, y: WORLD_HEIGHT - GROUND_HEIGHT, width: WORLD_WIDTH, height: GROUND_HEIGHT, rotation: 0 },
-            { x: 0, y: 5340, width: 9600, height: 60, rotation: 0 },
-            { x: 4098, y: 5278, width: 328, height: 45, rotation: -25.5 },
-            { x: 4598, y: 5151, width: 306, height: 37, rotation: 0 },
-            { x: 5114, y: 5039, width: 485, height: 60, rotation: 0 }
+            { x: 0, y: WORLD_HEIGHT - 60, width: WORLD_WIDTH, height: 60, rotation: 0 }
         ]
     }
 ];
@@ -36,7 +31,11 @@ function buildLevel() {
     platforms.length = 0;
 
     for (const b of level[0].blocks) {
-        platforms.push({ x: b.x, y: b.y, width: b.width, height: b.height });
+        platforms.push({
+            x: b.x, y: b.y,
+            width: b.width, height: b.height,
+            rotation: b.rotation || 0
+        });
     }
 }
 
@@ -82,18 +81,21 @@ class Player {
         this.y += this.velY;
         this.collide(1);
 
+        this.resolveRotatedCollisions();
+
         this.x = clamp(this.x, 0, WORLD_WIDTH  - this.width);
         this.y = clamp(this.y, 0, WORLD_HEIGHT - this.height);
     }
 
     collide(axis) {
         for (const p of platforms) {
+            if (p.rotation) continue;
             if (!isColliding(this, p)) continue;
 
             if (axis === 0) {
                 if (this.velX > 0)      this.x = p.x - this.width;
                 else if (this.velX < 0) this.x = p.x + p.width;
-                    this.velX = 0;
+                this.velX = 0;
             } else {
                 if (this.velY > 0) {
                     this.y = p.y - this.height;
@@ -101,6 +103,24 @@ class Player {
                 } else if (this.velY < 0) {
                     this.y = p.y + p.height;
                 }
+                this.velY = 0;
+            }
+        }
+    }
+
+    resolveRotatedCollisions() {
+        for (const p of platforms) {
+            if (!p.rotation) continue;
+            const hit = satCollide(this, p);
+            if (!hit) continue;
+
+            this.x += hit.axis.x * hit.depth;
+            this.y += hit.axis.y * hit.depth;
+
+            if (Math.abs(hit.axis.x) > Math.abs(hit.axis.y)) {
+                this.velX = 0;
+            } else {
+                if (hit.axis.y < 0 && this.velY > 0) this.onGround = true;
                 this.velY = 0;
             }
         }
@@ -118,6 +138,77 @@ class Player {
         ctx.fillRect(cx - this.width * 0.22, eyeY, eyeSize, eyeSize);
         ctx.fillRect(cx + this.width * 0.22 - eyeSize, eyeY, eyeSize, eyeSize);
     }
+}
+
+// ====== ROTATED COLLISION (SAT) ======
+function blockCorners(p) {
+    const cx = p.x + p.width / 2;
+    const cy = p.y + p.height / 2;
+    const rad = p.rotation * Math.PI / 180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    const hw = p.width / 2, hh = p.height / 2;
+    return [
+        { x: cx + (-hw) * cos - (-hh) * sin, y: cy + (-hw) * sin + (-hh) * cos },
+        { x: cx + ( hw) * cos - (-hh) * sin, y: cy + ( hw) * sin + (-hh) * cos },
+        { x: cx + ( hw) * cos - ( hh) * sin, y: cy + ( hw) * sin + ( hh) * cos },
+        { x: cx + (-hw) * cos - ( hh) * sin, y: cy + (-hw) * sin + ( hh) * cos }
+    ];
+}
+
+function rectCorners(r) {
+    return [
+        { x: r.x, y: r.y },
+        { x: r.x + r.width, y: r.y },
+        { x: r.x + r.width, y: r.y + r.height },
+        { x: r.x, y: r.y + r.height }
+    ];
+}
+
+function project(points, nx, ny) {
+    let min = Infinity, max = -Infinity;
+    for (const c of points) {
+        const v = c.x * nx + c.y * ny;
+        if (v < min) min = v;
+        if (v > max) max = v;
+    }
+    return [min, max];
+}
+
+function satCollide(rect, block) {
+    const rc = rectCorners(rect);
+    const bc = blockCorners(block);
+
+    const axes = [{ x: 1, y: 0 }, { x: 0, y: 1 }];
+    for (let i = 0; i < 4; i++) {
+        const p1 = bc[i];
+        const p2 = bc[(i + 1) % 4];
+        const ex = p2.x - p1.x, ey = p2.y - p1.y;
+        const len = Math.hypot(ex, ey);
+        if (len > 0) axes.push({ x: -ey / len, y: ex / len });
+    }
+
+    let minOverlap = Infinity;
+    let bestAxis = null;
+
+    for (const a of axes) {
+        const [minA, maxA] = project(rc, a.x, a.y);
+        const [minB, maxB] = project(bc, a.x, a.y);
+        if (maxA < minB || maxB < minA) return null;
+        const ov = Math.min(maxA, maxB) - Math.max(minA, minB);
+        if (ov < minOverlap) {
+            minOverlap = ov;
+            bestAxis = { x: a.x, y: a.y };
+        }
+    }
+
+    const rcx = rect.x + rect.width / 2;
+    const rcy = rect.y + rect.height / 2;
+    const bcx = block.x + block.width / 2;
+    const bcy = block.y + block.height / 2;
+    const d = (rcx - bcx) * bestAxis.x + (rcy - bcy) * bestAxis.y;
+    if (d < 0) { bestAxis.x *= -1; bestAxis.y *= -1; }
+
+    return { axis: bestAxis, depth: minOverlap };
 }
 
 // ====== CAMERA ======
@@ -158,7 +249,7 @@ function startGame() {
     isPaused = false;
 
     const spawnX = 60;
-    const spawnY = WORLD_HEIGHT - GROUND_HEIGHT - 80;
+    const spawnY = WORLD_HEIGHT - 140;
 
     playerObj = new Player(spawnX, spawnY);
     camera.follow(playerObj);
@@ -280,14 +371,34 @@ function drawWorld(ctx) {
     ctx.stroke();
 
     for (const p of platforms) {
-        if (p.x + p.width  < camera.x || p.x > viewRight)  continue;
-        if (p.y + p.height < camera.y || p.y > viewBottom) continue;
+        if (!p.rotation) {
+            if (p.x + p.width  < camera.x || p.x > viewRight)  continue;
+            if (p.y + p.height < camera.y || p.y > viewBottom) continue;
+        } else {
+            const diag = Math.hypot(p.width, p.height);
+            const cx = p.x + p.width / 2;
+            const cy = p.y + p.height / 2;
+            if (cx + diag < camera.x || cx - diag > viewRight)  continue;
+            if (cy + diag < camera.y || cy - diag > viewBottom) continue;
+        }
 
-        ctx.fillStyle = "#3b7dd8";
-        ctx.fillRect(p.x, p.y, p.width, p.height);
-
-        ctx.fillStyle = "#5aa0ff";
-        ctx.fillRect(p.x, p.y, p.width, 8);
+        if (!p.rotation) {
+            ctx.fillStyle = "#3b7dd8";
+            ctx.fillRect(p.x, p.y, p.width, p.height);
+            ctx.fillStyle = "#5aa0ff";
+            ctx.fillRect(p.x, p.y, p.width, 8);
+        } else {
+            const cx = p.x + p.width / 2;
+            const cy = p.y + p.height / 2;
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(p.rotation * Math.PI / 180);
+            ctx.fillStyle = "#3b7dd8";
+            ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+            ctx.fillStyle = "#5aa0ff";
+            ctx.fillRect(-p.width / 2, -p.height / 2, p.width, 8);
+            ctx.restore();
+        }
     }
 }
 
