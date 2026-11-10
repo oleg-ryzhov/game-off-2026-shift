@@ -28,7 +28,13 @@ const platforms = [];
 const level = [
     {
         blocks: [
-            { x: 0, y: WORLD_HEIGHT - 60, width: WORLD_WIDTH, height: 60, rotation: 0 }
+            { x: 0, y: WORLD_HEIGHT - 60, width: WORLD_WIDTH, height: 60, rotation: 0 },
+            { x: 0, y: 5340, width: 9600, height: 60, rotation: 0 },
+            { x: 290, y: 5180, width: 150, height: 40, rotation: 0 },
+            { x: 670, y: 5100, width: 150, height: 40, rotation: 0 },
+            { x: 1060, y: 5020, width: 150, height: 40, rotation: -19.3 },
+            { x: 1351, y: 5061, width: 145, height: 42, rotation: 48.3 },
+            { x: 1500, y: 4870, width: 568, height: 42, rotation: -73 },
         ]
     }
 ];
@@ -115,10 +121,12 @@ class Player {
             this.velY -= vDotN * ny;
         }
 
-        const spd = Math.hypot(this.velX, this.velY);
-        if (spd > SLOPE_MAX_SPEED) {
-            this.velX *= SLOPE_MAX_SPEED / spd;
-            this.velY *= SLOPE_MAX_SPEED / spd;
+        if (slopeActive) {
+            const spd = Math.hypot(this.velX, this.velY);
+            if (spd > SLOPE_MAX_SPEED) {
+                this.velX *= SLOPE_MAX_SPEED / spd;
+                this.velY *= SLOPE_MAX_SPEED / spd;
+            }
         }
 
         this.x += this.velX;
