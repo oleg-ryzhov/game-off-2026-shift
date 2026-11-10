@@ -656,4 +656,252 @@ function onMouseMove(e) {
     b.height = Math.abs(ey - s.y);
     updatePropsUI();
   } else if (dragState.type === 'player') {
-    let nx = dragState.startPlayer.x + (w.x - dragState
+    let nx = dragState.startPlayer.x + (w.x - dragState.startMouse.x);
+    let ny = dragState.startPlayer.y + (w.y - dragState.startMouse.y);
+    if (!shiftDown) { nx = snapVal(nx); ny = snapVal(ny); }
+    player.x = nx;
+    player.y = ny;
+    updatePropsUI();
+  }
+  render();
+}
+
+function doResize(w) {
+  const b = dragState.block;
+  const s = dragState.startBlock;
+  const h = dragState.handle;
+  const sm = dragState.startMouse;
+
+  const dxWorld = w.x - sm.x;
+  const dyWorld = w.y - sm.y;
+
+  const rad = s.rotation * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const dLocalX = dxWorld * cos + dyWorld * sin;
+  const dLocalY = -dxWorld * sin + dyWorld * cos;
+
+  const startHw = s.width / 2;
+  const startHh = s.height / 2;
+
+  let left = -startHw, right = startHw, top = -startHh, bottom = startHh;
+  if (h.includes('w')) left += dLocalX;
+  if (h.includes('e')) right += dLocalX;
+  if (h.includes('n')) top += dLocalY;
+  if (h.includes('s')) bottom += dLocalY;
+
+  const minSize = 4;
+  if (right - left < minSize) {
+    if (h.includes('w')) left = right - minSize;
+    else right = left + minSize;
+  }
+  if (bottom - top < minSize) {
+    if (h.includes('n')) top = bottom - minSize;
+    else bottom = top + minSize;
+  }
+
+  const newLcx = (left + right) / 2;
+  const newLcy = (top + bottom) / 2;
+  const newHw = (right - left) / 2;
+  const newHh = (bottom - top) / 2;
+
+  const startCx = s.x + s.width / 2;
+  const startCy = s.y + s.height / 2;
+  const newCx = startCx + newLcx * cos - newLcy * sin;
+  const newCy = startCy + newLcx * sin + newLcy * cos;
+
+  b.x = newCx - newHw;
+  b.y = newCy - newHh;
+  b.width = newHw * 2;
+  b.height = newHh * 2;
+  b.rotation = s.rotation;
+}
+
+function doRotate(w) {
+  const b = dragState.block;
+  const a = Math.atan2(w.y - dragState.cy, w.x - dragState.cx);
+  let delta = a - dragState.startAngle;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  let rot = dragState.startRotation + delta * 180 / Math.PI;
+  if (shiftDown) rot = Math.round(rot / 15) * 15;
+  while (rot > 180) rot -= 360;
+  while (rot < -180) rot += 360;
+  b.rotation = Math.round(rot * 10) / 10;
+}
+
+function onMouseUp() {
+  if (dragState && dragState.type === 'create') {
+    const b = dragState.block;
+    if (b.width < 4 || b.height < 4) {
+      b.width = snapGrid > 0 ? Math.max(snapGrid, 200) : 200;
+      b.height = snapGrid > 0 ? Math.max(snapGrid, 200) : 200;
+      b.x = dragState.startWorld.x;
+      b.y = dragState.startWorld.y;
+    }
+    setStatus('Block created');
+    updatePropsUI();
+  }
+  dragState = null;
+  render();
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const before = screenToWorld(sx, sy);
+  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+  cam.zoom = Math.max(0.02, Math.min(4, cam.zoom * factor));
+  const after = screenToWorld(sx, sy);
+  cam.x += before.x - after.x;
+  cam.y += before.y - after.y;
+  render();
+}
+
+document.getElementById('btnCreate').addEventListener('click', () => {
+  creating = true;
+  setStatus('Click-drag on canvas to create a block');
+});
+
+document.getElementById('btnDelete').addEventListener('click', () => {
+  if (!selected) return;
+  const i = blocks.indexOf(selected);
+  if (i >= 0) {
+    blocks.splice(i, 1);
+    selected = null;
+    updatePropsUI();
+    render();
+    setStatus('Block deleted');
+  }
+});
+
+document.getElementById('btnFit').addEventListener('click', () => {
+  fitView();
+  setStatus('View fitted');
+});
+
+document.getElementById('btnExport').addEventListener('click', () => {
+  outputEl.value = generateExport();
+  setStatus('Exported');
+});
+
+document.getElementById('btnCopy').addEventListener('click', async () => {
+  const text = generateExport();
+  outputEl.value = text;
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus('Copied to clipboard');
+  } catch (err) {
+    outputEl.select();
+    try {
+      document.execCommand('copy');
+      setStatus('Copied (fallback)');
+    } catch (e2) {
+      setStatus('Copy failed — select and copy manually');
+    }
+  }
+});
+
+function generateExport() {
+  let s = 'blocks: [\n';
+  for (const b of blocks) {
+    s += '    { x: ' + Math.round(b.x) +
+         ', y: ' + Math.round(b.y) +
+         ', width: ' + Math.round(b.width) +
+         ', height: ' + Math.round(b.height) +
+         ', rotation: ' + (Math.round(b.rotation * 10) / 10) + ' },\n';
+  }
+  s += ']';
+  return s;
+}
+
+function setStatus(t) {
+  statusEl.textContent = t;
+  clearTimeout(setStatus._t);
+  setStatus._t = setTimeout(() => { statusEl.textContent = 'Ready'; }, 2500);
+}
+
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+    if (e.key === 'Shift') shiftDown = true;
+    return;
+  }
+
+  if (e.key === 'Shift') shiftDown = true;
+
+  if (e.key === ' ') {
+    e.preventDefault();
+    spaceDown = true;
+    return;
+  }
+
+  if (e.key === 'Escape') {
+    selected = null;
+    creating = false;
+    updatePropsUI();
+    render();
+    return;
+  }
+
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (selected) {
+      const i = blocks.indexOf(selected);
+      if (i >= 0) blocks.splice(i, 1);
+      selected = null;
+      updatePropsUI();
+      render();
+      setStatus('Block deleted');
+    }
+    e.preventDefault();
+    return;
+  }
+
+  if (e.key === 'c' || e.key === 'C') {
+    creating = true;
+    setStatus('Click-drag on canvas to create a block');
+    return;
+  }
+
+  if (selected) {
+    const base = snapGrid > 0 ? snapGrid : 1;
+    const step = e.shiftKey ? base * 10 : base;
+    let moved = false;
+    if (e.key === 'ArrowLeft')  { selected.x -= step; moved = true; e.preventDefault(); }
+    if (e.key === 'ArrowRight') { selected.x += step; moved = true; e.preventDefault(); }
+    if (e.key === 'ArrowUp')    { selected.y -= step; moved = true; e.preventDefault(); }
+    if (e.key === 'ArrowDown')  { selected.y += step; moved = true; e.preventDefault(); }
+    if (moved) {
+      updatePropsUI();
+      render();
+    }
+  }
+});
+
+document.addEventListener('keyup', e => {
+  if (e.key === 'Shift') shiftDown = false;
+  if (e.key === ' ') spaceDown = false;
+});
+
+window.addEventListener('blur', () => {
+  shiftDown = false;
+  spaceDown = false;
+});
+
+canvas.addEventListener('mousedown', onMouseDown);
+document.addEventListener('mousemove', onMouseMove);
+document.addEventListener('mouseup', onMouseUp);
+canvas.addEventListener('wheel', onWheel, { passive: false });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('load', () => {
+  resizeCanvas();
+  fitView();
+  updatePropsUI();
+  setStatus('Ready — press C or + CREATE to add a block');
+});
+</script>
+</body>
+</html>
