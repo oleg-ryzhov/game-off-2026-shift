@@ -1,34 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Level Editor</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LEVEL EDITOR</title>
 <style>
-  * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #111; color: #e0e0e0; }
-  #editor { display: flex; height: 100vh; }
-  #canvasWrap { flex: 1; position: relative; overflow: hidden; }
-  #canvas { display: block; }
-  #panel { width: 340px; background: #1a1a1a; padding: 14px; overflow-y: auto; border-left: 1px solid #333; }
-  #panel h2 { margin: 16px 0 8px; font-size: 12px; letter-spacing: 2px; color: #5aa0ff; }
-  #panel h2:first-child { margin-top: 0; }
-  #panel label { display: block; margin: 8px 0 4px; font-size: 11px; color: #999; letter-spacing: 1px; }
-  #panel input { width: 100%; padding: 6px 8px; background: #0a0a0a; color: #e0e0e0; border: 1px solid #333; font-family: inherit; font-size: 13px; }
-  #panel input:focus { outline: none; border-color: #5aa0ff; }
-  .row { display: flex; gap: 8px; }
-  .row > div { flex: 1; }
-  button { display: block; width: 100%; padding: 9px; margin: 6px 0; background: #2a2a2a; color: #e0e0e0; border: 1px solid #444; font-family: inherit; font-size: 11px; font-weight: bold; letter-spacing: 1px; cursor: pointer; transition: background .12s, border-color .12s; }
-  button:hover { background: #3a3a3a; border-color: #666; }
-  button.primary { background: #1e4a7a; border-color: #3b7dd8; color: #cfe8ff; }
-  button.primary:hover { background: #3b7dd8; }
-  button.danger { background: #4a1a1a; border-color: #833; color: #ffcaca; }
-  button.danger:hover { background: #a03030; }
-  #output { width: 100%; height: 160px; padding: 8px; background: #080808; color: #6f6; border: 1px solid #333; font-family: inherit; font-size: 10px; resize: vertical; margin-top: 8px; }
-  #status { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.75); border: 1px solid #333; padding: 5px 10px; font-size: 11px; color: #9c9; pointer-events: none; }
-  .hint { font-size: 10px; color: #666; line-height: 1.6; margin-top: 8px; border-top: 1px solid #2a2a2a; padding-top: 8px; }
-  .hint b { color: #888; }
-  .prop-group { transition: opacity .15s; }
-  .prop-group.disabled { opacity: 0.3; pointer-events: none; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #111; color: #e0e0e0; }
+#editor { display: flex; height: 100vh; }
+#canvasWrap { flex: 1; position: relative; overflow: hidden; }
+#canvas { display: block; }
+#panel { width: 340px; background: #1a1a1a; padding: 14px; overflow-y: auto; border-left: 1px solid #333; }
+#panel h2 { margin: 16px 0 8px; font-size: 12px; letter-spacing: 2px; color: #5aa0ff; }
+#panel h2:first-child { margin-top: 0; }
+#panel label { display: block; margin: 8px 0 4px; font-size: 11px; color: #999; letter-spacing: 1px; }
+#panel input[type="number"] { width: 100%; padding: 6px 8px; background: #0a0a0a; color: #e0e0e0; border: 1px solid #333; font-family: inherit; font-size: 13px; }
+#panel input[type="number"]:focus { outline: none; border-color: #5aa0ff; }
+#panel select { width: 100%; padding: 6px 8px; background: #0a0a0a; color: #e0e0e0; border: 1px solid #333; font-family: inherit; font-size: 13px; }
+#panel select:focus { outline: none; border-color: #5aa0ff; }
+.row { display: flex; gap: 8px; }
+.row > div { flex: 1; }
+button { display: block; width: 100%; padding: 9px; margin: 6px 0; background: #2a2a2a; color: #e0e0e0; border: 1px solid #444; font-family: inherit; font-size: 11px; font-weight: bold; letter-spacing: 1px; cursor: pointer; transition: background .12s, border-color .12s; }
+button:hover { background: #3a3a3a; border-color: #666; }
+button.primary { background: #1e4a7a; border-color: #3b7dd8; color: #cfe8ff; }
+button.primary:hover { background: #3b7dd8; }
+button.danger { background: #4a1a1a; border-color: #833; color: #ffcaca; }
+button.danger:hover { background: #a03030; }
+#output { width: 100%; height: 160px; padding: 8px; background: #080808; color: #6f6; border: 1px solid #333; font-family: inherit; font-size: 10px; resize: vertical; margin-top: 8px; }
+#status { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.75); border: 1px solid #333; padding: 5px 10px; font-size: 11px; color: #9c9; pointer-events: none; }
+.hint { font-size: 10px; color: #666; line-height: 1.6; margin-top: 8px; border-top: 1px solid #2a2a2a; padding-top: 8px; }
+.hint b { color: #888; }
+.prop-group { transition: opacity .15s; }
+.prop-group.disabled { opacity: 0.3; pointer-events: none; }
+.chk-row { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; color: #ccc; margin: 8px 0; letter-spacing: 1px; }
+.chk-row input[type="checkbox"] { width: auto; }
 </style>
 </head>
 <body>
@@ -43,7 +48,11 @@
     <button id="btnDelete" class="danger">DELETE SELECTED</button>
     <button id="btnFit">FIT VIEW</button>
 
-    <h2>PROPERTIES</h2>
+    <h2>SNAP GRID</h2>
+    <label>GRID SIZE (px, 0 = off)</label>
+    <input type="number" id="inpSnap" value="10" step="1" min="0">
+
+    <h2>BLOCK PROPERTIES</h2>
     <div class="prop-group disabled" id="propGroup">
       <div class="row">
         <div><label>X</label><input type="number" id="inpX" step="1"></div>
@@ -57,19 +66,38 @@
       <input type="number" id="inpR" step="1">
     </div>
 
+    <h2>PLAYER</h2>
+    <div class="row">
+      <div><label>X</label><input type="number" id="inpPX" step="1"></div>
+      <div><label>Y</label><input type="number" id="inpPY" step="1"></div>
+    </div>
+    <label>SIZE (px)</label>
+    <input type="number" id="inpPSize" step="1" value="80" min="10">
+
+    <h2>JUMP LINE</h2>
+    <label class="chk-row">
+      <input type="checkbox" id="chkJump" checked>
+      SHOW JUMP ARC
+    </label>
+    <label>REACH (px, max 355)</label>
+    <input type="number" id="inpJumpReach" value="355" step="1" min="0" max="355">
+    <label>DIRECTION</label>
+    <select id="selJumpDir">
+      <option value="1">RIGHT</option>
+      <option value="-1">LEFT</option>
+    </select>
+
     <h2>EXPORT</h2>
     <button id="btnExport">EXPORT BLOCKS ARRAY</button>
     <button id="btnCopy" class="primary">SAVE TO CLIPBOARD</button>
     <textarea id="output" readonly placeholder="Press EXPORT to generate..."></textarea>
 
     <div class="hint">
-      <b>Drag:</b> move block<br>
-      <b>Handles:</b> resize<br>
-      <b>Top knob:</b> rotate<br>
-      <b>Wheel:</b> zoom<br>
+      <b>Drag block:</b> move &middot; <b>Handles:</b> resize<br>
+      <b>Top knob:</b> rotate &middot; <b>Wheel:</b> zoom<br>
       <b>Right/Middle/SPACE+drag:</b> pan<br>
-      <b>SHIFT+move:</b> snap 10<br>
-      <b>SHIFT+rotate:</b> snap 15&deg;<br>
+      <b>Drag player icon:</b> reposition spawn<br>
+      <b>SHIFT:</b> fine control (no snap)<br>
       <b>Arrows:</b> nudge &middot; <b>DEL:</b> delete &middot; <b>ESC:</b> deselect &middot; <b>C:</b> create
     </div>
   </div>
@@ -79,6 +107,8 @@
 
 const WORLD_W = 9600;
 const WORLD_H = 5400;
+const JUMP_HEIGHT = 222;
+const MAX_JUMP_REACH = 355;
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -91,13 +121,22 @@ const cam = { x: 0, y: 0, zoom: 0.1 };
 let blocks = [
   { x: 0, y: WORLD_H - 60, width: WORLD_W, height: 60, rotation: 0 }
 ];
+let player = { x: 60, y: WORLD_H - 140, size: 80 };
 let selected = null;
 let dragState = null;
 let creating = false;
+let snapGrid = 10;
+let showJump = true;
+let jumpReach = MAX_JUMP_REACH;
+let jumpDir = 1;
 
-let mouseScreen = { x: -1, y: -1 };
 let shiftDown = false;
 let spaceDown = false;
+
+function snapVal(v) {
+  if (snapGrid <= 0) return v;
+  return Math.round(v / snapGrid) * snapGrid;
+}
 
 function resizeCanvas() {
   const wrap = document.getElementById('canvasWrap');
@@ -137,6 +176,11 @@ function pointInBlock(px, py, b) {
   const ly = dx * sin + dy * cos + cy;
   return lx >= b.x && lx <= b.x + b.width &&
          ly >= b.y && ly <= b.y + b.height;
+}
+
+function pointInPlayer(px, py) {
+  return px >= player.x && px <= player.x + player.size &&
+         py >= player.y && py <= player.y + player.size;
 }
 
 function getHandles(b) {
@@ -189,9 +233,11 @@ function render() {
 
   drawGrid();
 
-  for (const b of blocks) {
-    drawBlock(b, b === selected);
-  }
+  for (const b of blocks) drawBlock(b, b === selected);
+
+  if (showJump) drawJumpArc();
+
+  drawPlayerIcon();
 
   if (selected) drawSelection(selected);
 }
@@ -204,8 +250,8 @@ function drawGrid() {
   const y0 = Math.max(tl.y, 0);
   const y1 = Math.min(br.y, canvas.clientHeight);
 
-  let step = 240;
-  while (step * cam.zoom < 8) step *= 2;
+  let step = snapGrid > 0 ? snapGrid : 60;
+  while (step * cam.zoom < 6) step *= 2;
 
   ctx.strokeStyle = '#1c1c1c';
   ctx.lineWidth = 1;
@@ -275,14 +321,14 @@ function drawBlock(b, isSelected) {
 
 function drawSelection(b) {
   const handles = getHandles(b);
-  ctx.fillStyle = '#fff';
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 1;
   for (const hd of handles) {
     const s = worldToScreen(hd.x, hd.y);
     ctx.beginPath();
     ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
     ctx.fill();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
     ctx.stroke();
   }
 
@@ -292,6 +338,8 @@ function drawSelection(b) {
   ctx.arc(rs.x, rs.y, 6, 0, Math.PI * 2);
   ctx.fillStyle = '#ffb020';
   ctx.fill();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
   ctx.stroke();
 
   const tc = getTopCenter(b);
@@ -302,6 +350,91 @@ function drawSelection(b) {
   ctx.moveTo(tcs.x, tcs.y);
   ctx.lineTo(rs.x, rs.y);
   ctx.stroke();
+}
+
+function drawPlayerIcon() {
+  const s = worldToScreen(player.x, player.y);
+  const size = player.size * cam.zoom;
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.fillRect(s.x, s.y, size, size);
+
+  ctx.strokeStyle = '#ff5050';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(s.x, s.y, size, size);
+
+  if (size > 16) {
+    const eyeSize = Math.max(2, size * 0.14);
+    const eyeY = s.y + size * 0.28;
+    const cx = s.x + size / 2 + size * 0.12;
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(cx - size * 0.22, eyeY, eyeSize, eyeSize);
+    ctx.fillRect(cx + size * 0.22 - eyeSize, eyeY, eyeSize, eyeSize);
+  }
+}
+
+function drawJumpArc() {
+  const px = player.x + player.size / 2;
+  const py = player.y + player.size;
+  const apex = JUMP_HEIGHT;
+  const reach = jumpReach * jumpDir;
+
+  const N = 64;
+  const samples = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const x = px + reach * t;
+    const y = py - apex + apex * Math.pow(2 * t - 1, 2);
+    samples.push(worldToScreen(x, y));
+  }
+
+  const auraWidth = Math.max(2, player.size * cam.zoom);
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.lineWidth = auraWidth * 1.6;
+  ctx.beginPath();
+  for (let i = 0; i < samples.length; i++) {
+    if (i === 0) ctx.moveTo(samples[i].x, samples[i].y);
+    else ctx.lineTo(samples[i].x, samples[i].y);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.20)';
+  ctx.lineWidth = auraWidth;
+  ctx.beginPath();
+  for (let i = 0; i < samples.length; i++) {
+    if (i === 0) ctx.moveTo(samples[i].x, samples[i].y);
+    else ctx.lineTo(samples[i].x, samples[i].y);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.lineWidth = auraWidth * 0.55;
+  ctx.beginPath();
+  for (let i = 0; i < samples.length; i++) {
+    if (i === 0) ctx.moveTo(samples[i].x, samples[i].y);
+    else ctx.lineTo(samples[i].x, samples[i].y);
+  }
+  ctx.stroke();
+
+  ctx.shadowColor = 'rgba(255, 255, 255, 0.9)';
+  ctx.shadowBlur = 12;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([10, 10]);
+  ctx.beginPath();
+  for (let i = 0; i < samples.length; i++) {
+    if (i === 0) ctx.moveTo(samples[i].x, samples[i].y);
+    else ctx.lineTo(samples[i].x, samples[i].y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.restore();
 }
 
 function updatePropsUI() {
@@ -318,24 +451,63 @@ function updatePropsUI() {
       document.getElementById(id).value = '';
     });
   }
+  document.getElementById('inpPX').value = Math.round(player.x);
+  document.getElementById('inpPY').value = Math.round(player.y);
+  document.getElementById('inpPSize').value = Math.round(player.size);
+  document.getElementById('inpSnap').value = snapGrid;
+  document.getElementById('chkJump').checked = showJump;
+  document.getElementById('inpJumpReach').value = Math.round(jumpReach);
+  document.getElementById('selJumpDir').value = String(jumpDir);
 }
 
-function bindProp(id, field) {
+function bindProp(id, field, opts) {
   const el = document.getElementById(id);
   el.addEventListener('input', () => {
     if (!selected) return;
-    const v = parseFloat(el.value);
-    if (!isNaN(v)) {
-      selected[field] = v;
-      render();
-    }
+    let v = parseFloat(el.value);
+    if (isNaN(v)) return;
+    if (opts && opts.min !== undefined) v = Math.max(opts.min, v);
+    selected[field] = v;
+    render();
   });
 }
 bindProp('inpX', 'x');
 bindProp('inpY', 'y');
-bindProp('inpW', 'width');
-bindProp('inpH', 'height');
+bindProp('inpW', 'width', { min: 1 });
+bindProp('inpH', 'height', { min: 1 });
 bindProp('inpR', 'rotation');
+
+document.getElementById('inpPX').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  if (!isNaN(v)) { player.x = v; render(); }
+});
+document.getElementById('inpPY').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  if (!isNaN(v)) { player.y = v; render(); }
+});
+document.getElementById('inpPSize').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  if (!isNaN(v) && v >= 10) { player.size = v; render(); }
+});
+document.getElementById('inpSnap').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  if (!isNaN(v) && v >= 0) { snapGrid = v; render(); }
+});
+document.getElementById('chkJump').addEventListener('change', e => {
+  showJump = e.target.checked;
+  render();
+});
+document.getElementById('inpJumpReach').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  if (!isNaN(v)) {
+    jumpReach = Math.max(0, Math.min(MAX_JUMP_REACH, v));
+    render();
+  }
+});
+document.getElementById('selJumpDir').addEventListener('change', e => {
+  jumpDir = parseInt(e.target.value, 10);
+  render();
+});
 
 function startMove(b, w) {
   dragState = {
@@ -387,13 +559,13 @@ function onMouseDown(e) {
 
   if (creating) {
     creating = false;
-    const b = { x: w.x, y: w.y, width: 0, height: 0, rotation: 0 };
+    const b = { x: snapVal(w.x), y: snapVal(w.y), width: 0, height: 0, rotation: 0 };
     blocks.push(b);
     selected = b;
     dragState = {
       type: 'create',
       block: b,
-      startWorld: { x: w.x, y: w.y }
+      startWorld: { x: snapVal(w.x), y: snapVal(w.y) }
     };
     updatePropsUI();
     setStatus('Drag to size the new block');
@@ -418,6 +590,18 @@ function onMouseDown(e) {
     }
   }
 
+  if (pointInPlayer(w.x, w.y)) {
+    selected = null;
+    dragState = {
+      type: 'player',
+      startMouse: { x: w.x, y: w.y },
+      startPlayer: { x: player.x, y: player.y }
+    };
+    updatePropsUI();
+    render();
+    return;
+  }
+
   let hit = null;
   for (let i = blocks.length - 1; i >= 0; i--) {
     if (pointInBlock(w.x, w.y, blocks[i])) { hit = blocks[i]; break; }
@@ -438,8 +622,6 @@ function onMouseMove(e) {
   const rect = canvas.getBoundingClientRect();
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
-  mouseScreen.x = sx;
-  mouseScreen.y = sy;
 
   if (!dragState) return;
 
@@ -451,12 +633,11 @@ function onMouseMove(e) {
   } else if (dragState.type === 'move') {
     const b = dragState.block;
     const s = dragState.startBlock;
-    b.x = s.x + (w.x - dragState.startMouse.x);
-    b.y = s.y + (w.y - dragState.startMouse.y);
-    if (shiftDown) {
-      b.x = Math.round(b.x / 10) * 10;
-      b.y = Math.round(b.y / 10) * 10;
-    }
+    let nx = s.x + (w.x - dragState.startMouse.x);
+    let ny = s.y + (w.y - dragState.startMouse.y);
+    if (!shiftDown) { nx = snapVal(nx); ny = snapVal(ny); }
+    b.x = nx;
+    b.y = ny;
     updatePropsUI();
   } else if (dragState.type === 'resize') {
     doResize(w);
@@ -467,246 +648,12 @@ function onMouseMove(e) {
   } else if (dragState.type === 'create') {
     const b = dragState.block;
     const s = dragState.startWorld;
-    b.x = Math.min(s.x, w.x);
-    b.y = Math.min(s.y, w.y);
-    b.width = Math.abs(w.x - s.x);
-    b.height = Math.abs(w.y - s.y);
+    const ex = shiftDown ? w.x : snapVal(w.x);
+    const ey = shiftDown ? w.y : snapVal(w.y);
+    b.x = Math.min(s.x, ex);
+    b.y = Math.min(s.y, ey);
+    b.width = Math.abs(ex - s.x);
+    b.height = Math.abs(ey - s.y);
     updatePropsUI();
-  }
-  render();
-}
-
-function doResize(w) {
-  const b = dragState.block;
-  const s = dragState.startBlock;
-  const h = dragState.handle;
-  const sm = dragState.startMouse;
-
-  const dxWorld = w.x - sm.x;
-  const dyWorld = w.y - sm.y;
-
-  const rad = s.rotation * Math.PI / 180;
-  const cos = Math.cos(rad), sin = Math.sin(rad);
-  const dLocalX = dxWorld * cos + dyWorld * sin;
-  const dLocalY = -dxWorld * sin + dyWorld * cos;
-
-  const startHw = s.width / 2;
-  const startHh = s.height / 2;
-
-  let left = -startHw, right = startHw, top = -startHh, bottom = startHh;
-  if (h.includes('w')) left += dLocalX;
-  if (h.includes('e')) right += dLocalX;
-  if (h.includes('n')) top += dLocalY;
-  if (h.includes('s')) bottom += dLocalY;
-
-  const minSize = 4;
-  if (right - left < minSize) {
-    if (h.includes('w')) left = right - minSize;
-    else right = left + minSize;
-  }
-  if (bottom - top < minSize) {
-    if (h.includes('n')) top = bottom - minSize;
-    else bottom = top + minSize;
-  }
-
-  const newLcx = (left + right) / 2;
-  const newLcy = (top + bottom) / 2;
-  const newHw = (right - left) / 2;
-  const newHh = (bottom - top) / 2;
-
-  const startCx = s.x + s.width / 2;
-  const startCy = s.y + s.height / 2;
-  const newCx = startCx + newLcx * cos - newLcy * sin;
-  const newCy = startCy + newLcx * sin + newLcy * cos;
-
-  b.x = newCx - newHw;
-  b.y = newCy - newHh;
-  b.width = newHw * 2;
-  b.height = newHh * 2;
-  b.rotation = s.rotation;
-}
-
-function doRotate(w) {
-  const b = dragState.block;
-  const a = Math.atan2(w.y - dragState.cy, w.x - dragState.cx);
-  let delta = a - dragState.startAngle;
-  while (delta > Math.PI) delta -= Math.PI * 2;
-  while (delta < -Math.PI) delta += Math.PI * 2;
-  let rot = dragState.startRotation + delta * 180 / Math.PI;
-  if (shiftDown) rot = Math.round(rot / 15) * 15;
-  while (rot > 180) rot -= 360;
-  while (rot < -180) rot += 360;
-  b.rotation = Math.round(rot * 10) / 10;
-}
-
-function onMouseUp() {
-  if (dragState && dragState.type === 'create') {
-    const b = dragState.block;
-    if (b.width < 4 || b.height < 4) {
-      b.width = 200;
-      b.height = 200;
-      b.x = dragState.startWorld.x - 100;
-      b.y = dragState.startWorld.y - 100;
-    }
-    setStatus('Block created');
-    updatePropsUI();
-  }
-  dragState = null;
-  render();
-}
-
-function onWheel(e) {
-  e.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const sx = e.clientX - rect.left;
-  const sy = e.clientY - rect.top;
-  const before = screenToWorld(sx, sy);
-  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-  cam.zoom = Math.max(0.02, Math.min(4, cam.zoom * factor));
-  const after = screenToWorld(sx, sy);
-  cam.x += before.x - after.x;
-  cam.y += before.y - after.y;
-  render();
-}
-
-document.getElementById('btnCreate').addEventListener('click', () => {
-  creating = true;
-  setStatus('Click-drag on canvas to create a block');
-});
-
-document.getElementById('btnDelete').addEventListener('click', () => {
-  if (!selected) return;
-  const i = blocks.indexOf(selected);
-  if (i >= 0) {
-    blocks.splice(i, 1);
-    selected = null;
-    updatePropsUI();
-    render();
-    setStatus('Block deleted');
-  }
-});
-
-document.getElementById('btnFit').addEventListener('click', () => {
-  fitView();
-  setStatus('View fitted');
-});
-
-document.getElementById('btnExport').addEventListener('click', () => {
-  outputEl.value = generateExport();
-  setStatus('Exported');
-});
-
-document.getElementById('btnCopy').addEventListener('click', async () => {
-  const text = generateExport();
-  outputEl.value = text;
-  try {
-    await navigator.clipboard.writeText(text);
-    setStatus('Copied to clipboard');
-  } catch (err) {
-    outputEl.select();
-    try {
-      document.execCommand('copy');
-      setStatus('Copied (fallback)');
-    } catch (e2) {
-      setStatus('Copy failed — select and copy manually');
-    }
-  }
-});
-
-function generateExport() {
-  let s = 'blocks: [\n';
-  for (const b of blocks) {
-    s += '    { x: ' + Math.round(b.x) +
-         ', y: ' + Math.round(b.y) +
-         ', width: ' + Math.round(b.width) +
-         ', height: ' + Math.round(b.height) +
-         ', rotation: ' + (Math.round(b.rotation * 10) / 10) + ' },\n';
-  }
-  s += ']';
-  return s;
-}
-
-function setStatus(t) {
-  statusEl.textContent = t;
-  clearTimeout(setStatus._t);
-  setStatus._t = setTimeout(() => { statusEl.textContent = 'Ready'; }, 2500);
-}
-
-document.addEventListener('keydown', e => {
-  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
-
-  if (e.key === 'Shift') shiftDown = true;
-
-  if (e.key === ' ') {
-    e.preventDefault();
-    spaceDown = true;
-    return;
-  }
-
-  if (e.key === 'Escape') {
-    selected = null;
-    creating = false;
-    updatePropsUI();
-    render();
-    return;
-  }
-
-  if (e.key === 'Delete' || e.key === 'Backspace') {
-    if (selected) {
-      const i = blocks.indexOf(selected);
-      if (i >= 0) blocks.splice(i, 1);
-      selected = null;
-      updatePropsUI();
-      render();
-      setStatus('Block deleted');
-    }
-    e.preventDefault();
-    return;
-  }
-
-  if (e.key === 'c' || e.key === 'C') {
-    creating = true;
-    setStatus('Click-drag on canvas to create a block');
-    return;
-  }
-
-  if (selected) {
-    const step = e.shiftKey ? 10 : 1;
-    let moved = false;
-    if (e.key === 'ArrowLeft')  { selected.x -= step; moved = true; e.preventDefault(); }
-    if (e.key === 'ArrowRight') { selected.x += step; moved = true; e.preventDefault(); }
-    if (e.key === 'ArrowUp')    { selected.y -= step; moved = true; e.preventDefault(); }
-    if (e.key === 'ArrowDown')  { selected.y += step; moved = true; e.preventDefault(); }
-    if (moved) {
-      updatePropsUI();
-      render();
-    }
-  }
-});
-
-document.addEventListener('keyup', e => {
-  if (e.key === 'Shift') shiftDown = false;
-  if (e.key === ' ') spaceDown = false;
-});
-
-window.addEventListener('blur', () => {
-  shiftDown = false;
-  spaceDown = false;
-});
-
-canvas.addEventListener('mousedown', onMouseDown);
-document.addEventListener('mousemove', onMouseMove);
-document.addEventListener('mouseup', onMouseUp);
-canvas.addEventListener('wheel', onWheel, { passive: false });
-canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-window.addEventListener('resize', resizeCanvas);
-window.addEventListener('load', () => {
-  resizeCanvas();
-  fitView();
-  updatePropsUI();
-  setStatus('Ready — press C or + CREATE to add a block');
-});
-</script>
-</body>
-</html>
+  } else if (dragState.type === 'player') {
+    let nx = dragState.startPlayer.x + (w.x - dragState
