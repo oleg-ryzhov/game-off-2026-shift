@@ -433,14 +433,10 @@ function drawBlock(b, isSelected) {
   ctx.fillStyle = isSelected ? '#5aa0ff' : '#3b7dd8';
   ctx.fillRect(-w / 2, -h / 2, w, h);
 
-  ctx.strokeStyle = isSelected ? '#fff' : '#1a4a8a';
-  ctx.lineWidth = isSelected ? 2 : 1;
-  ctx.strokeRect(-w / 2, -h / 2, w, h);
-
-  if (w > 4 && h > 4) {
-    ctx.fillStyle = 'rgba(140,200,255,0.5)';
-    const th = Math.min(8 * cam.zoom, h * 0.15);
-    if (th > 0.5) ctx.fillRect(-w / 2, -h / 2, w, th);
+  if (isSelected) {
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-w / 2, -h / 2, w, h);
   }
 
   ctx.restore();
