@@ -26,7 +26,7 @@ const SLOPE_MAX_SPEED    = 13;
 const MAX_SATURATION = 100;
 const COST_TO_ENTER_B = 5;
 const COST_TO_LEAVE_B = 5;
-const DRAIN_RATE = 100 / 6000; // 2 minutes (120s) at 50 ticks per second
+const DRAIN_RATE = 100 / 6000;
 
 // ====== LEVEL ======
 const platforms = [];
@@ -605,6 +605,8 @@ function drawWorld(ctx) {
     }
     ctx.stroke();
 
+    const blockColor = currentDimension === 'B' ? "#8a3030" : "#3b7dd8";
+
     for (const p of platforms) {
         if (!p.rotation) {
             if (p.x + p.width  < camera.x || p.x > viewRight)  continue;
@@ -617,21 +619,17 @@ function drawWorld(ctx) {
             if (cy + diag < camera.y || cy - diag > viewBottom) continue;
         }
 
+        ctx.fillStyle = blockColor;
+
         if (!p.rotation) {
-            ctx.fillStyle = currentDimension === 'B' ? "#8a3030" : "#3b7dd8";
             ctx.fillRect(p.x, p.y, p.width, p.height);
-            ctx.fillStyle = currentDimension === 'B' ? "#c05050" : "#5aa0ff";
-            ctx.fillRect(p.x, p.y, p.width, 8);
         } else {
             const cx = p.x + p.width / 2;
             const cy = p.y + p.height / 2;
             ctx.save();
             ctx.translate(cx, cy);
             ctx.rotate(p.rotation * Math.PI / 180);
-            ctx.fillStyle = currentDimension === 'B' ? "#8a3030" : "#3b7dd8";
             ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
-            ctx.fillStyle = currentDimension === 'B' ? "#c05050" : "#5aa0ff";
-            ctx.fillRect(-p.width / 2, -p.height / 2, p.width, 8);
             ctx.restore();
         }
     }
