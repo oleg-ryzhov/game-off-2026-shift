@@ -24,9 +24,9 @@ const SLOPE_MAX_SPEED    = 13;
 
 // ====== DIMENSION CONSTANTS ======
 const MAX_SATURATION = 100;
-const COST_TO_ENTER_B = 15;
-const COST_TO_LEAVE_B = 15;
-const DRAIN_RATE = 0.08;
+const COST_TO_ENTER_B = 5;
+const COST_TO_LEAVE_B = 5;
+const DRAIN_RATE = 100 / 6000; // 2 minutes (120s) at 50 ticks per second
 
 // ====== LEVEL ======
 const platforms = [];
@@ -79,19 +79,18 @@ function toggleDimension() {
     if (currentDimension === 'A') {
         if (!canEnterB || saturation < COST_TO_ENTER_B) return;
         saturation -= COST_TO_ENTER_B;
-        if (saturation <= 0) {
-            saturation = 0;
-            canEnterB = false;
-            return;
-        }
         currentDimension = 'B';
     } else {
         saturation -= COST_TO_LEAVE_B;
-        if (saturation <= 0) {
-            saturation = 0;
-            canEnterB = false;
-        }
         currentDimension = 'A';
+    }
+    if (saturation <= 0) {
+        saturation = 0;
+        canEnterB = false;
+        if (currentDimension === 'B') {
+            forceKickFromB();
+            return;
+        }
     }
     buildLevel();
 }
@@ -654,28 +653,21 @@ function drawHud(ctx) {
     }
 
     if (currentDimension === 'B') {
-        const barW = 400;
-        const barH = 20;
-        const barX = (VIEW_WIDTH - barW) / 2;
-        const barY = 30;
-        
-        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        const barW = 160;
+        const barH = 12;
+        const barX = 20;
+        const barY = 20;
+
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
         ctx.fillRect(barX, barY, barW, barH);
-        
+
         const pct = Math.max(0, saturation / MAX_SATURATION);
-        ctx.fillStyle = pct > 0.3 ? "#f0f" : "#f00";
-        ctx.fillRect(barX, barY, barW * pct, barH);
-        
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 2;
+        ctx.fillStyle = "#00d9ff";
+        ctx.fillRect(barX + 1, barY + 1, (barW - 2) * pct, barH - 2);
+
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.lineWidth = 1;
         ctx.strokeRect(barX, barY, barW, barH);
-        
-        ctx.fillStyle = "#fff";
-        ctx.font = "16px monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillText("SATURATION", barX + barW / 2, barY + barH + 5);
-        ctx.textAlign = "left";
     }
 }
 
