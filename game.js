@@ -22,12 +22,18 @@ const SLOPE_SLIDE_ACCEL  = 2.5;
 const SLOPE_EJECT_SPEED  = 4;
 const SLOPE_MAX_SPEED    = 13;
 
+// ====== DIMENSION CONSTANTS ======
+const MAX_SATURATION = 100;
+const COST_TO_ENTER_B = 15;
+const COST_TO_LEAVE_B = 15;
+const DRAIN_RATE = 0.08;
+
 // ====== LEVEL ======
 const platforms = [];
 
 const level = [
     {
-        blocks: [
+        dimensionA: [
             { x: 0, y: WORLD_HEIGHT - 60, width: WORLD_WIDTH, height: 60, rotation: 0 },
             { x: 0, y: 5340, width: 9600, height: 60, rotation: 0 },
             { x: 290, y: 5180, width: 150, height: 40, rotation: 0 },
@@ -35,14 +41,22 @@ const level = [
             { x: 1060, y: 5020, width: 150, height: 40, rotation: -19.3 },
             { x: 1351, y: 5061, width: 145, height: 42, rotation: 48.3 },
             { x: 1500, y: 4870, width: 568, height: 42, rotation: -73 },
+        ],
+        dimensionB: [
+            { x: 0, y: WORLD_HEIGHT - 60, width: WORLD_WIDTH, height: 60, rotation: 0 },
+            { x: 290, y: 5180, width: 150, height: 40, rotation: 25 },
+            { x: 1060, y: 5020, width: 150, height: 40, rotation: -45 },
+            { x: 1351, y: 5061, width: 145, height: 42, rotation: 75 },
+            { x: 1500, y: 4870, width: 568, height: 42, rotation: -85 },
         ]
     }
 ];
 
 function buildLevel() {
     platforms.length = 0;
-
-    for (const b of level[0].blocks) {
+    const blocks = currentDimension === 'A' ? level[0].dimensionA : level[0].dimensionB;
+    if (!blocks) return;
+    for (const b of blocks) {
         platforms.push({
             x: b.x, y: b.y,
             width: b.width, height: b.height,
@@ -55,6 +69,39 @@ function buildLevel() {
 const tickLength = 20;
 let frameAccumulator = 0;
 let lastTimestamp = 0;
+
+// ====== DIMENSION STATE ======
+let currentDimension = 'A';
+let saturation = MAX_SATURATION;
+let canEnterB = true;
+
+function toggleDimension() {
+    if (currentDimension === 'A') {
+        if (!canEnterB || saturation < COST_TO_ENTER_B) return;
+        saturation -= COST_TO_ENTER_B;
+        if (saturation <= 0) {
+            saturation = 0;
+            canEnterB = false;
+            return;
+        }
+        currentDimension = 'B';
+    } else {
+        saturation -= COST_TO_LEAVE_B;
+        if (saturation <= 0) {
+            saturation = 0;
+            canEnterB = false;
+        }
+        currentDimension = 'A';
+    }
+    buildLevel();
+}
+
+function forceKickFromB() {
+    saturation = 0;
+    canEnterB = false;
+    currentDimension = 'A';
+    buildLevel();
+}
 
 // ====== PLAYER CLASS ======
 class Player {
@@ -483,6 +530,13 @@ const gameArea = {
 function update() {
     if (!gameStarted || isPaused || !playerObj) return;
 
+    if (currentDimension === 'B') {
+        saturation -= DRAIN_RATE;
+        if (saturation <= 0) {
+            forceKickFromB();
+        }
+    }
+
     playerObj.update();
     camera.follow(playerObj);
 }
@@ -522,11 +576,11 @@ function drawWorld(ctx) {
     const viewRight  = camera.x + VIEW_WIDTH;
     const viewBottom = camera.y + VIEW_HEIGHT;
 
-    ctx.fillStyle = "#1a1a1a";
+    ctx.fillStyle = currentDimension === 'B' ? "#2a1010" : "#1a1a1a";
     ctx.fillRect(camera.x, camera.y, VIEW_WIDTH, VIEW_HEIGHT);
 
     const GRID = 240;
-    ctx.strokeStyle = "#242424";
+    ctx.strokeStyle = currentDimension === 'B' ? "#3a1818" : "#242424";
     ctx.lineWidth = 2;
     ctx.beginPath();
     for (let x = Math.floor(camera.x / GRID) * GRID; x <= viewRight; x += GRID) {
@@ -539,7 +593,7 @@ function drawWorld(ctx) {
     }
     ctx.stroke();
 
-    ctx.strokeStyle = "#3a3a3a";
+    ctx.strokeStyle = currentDimension === 'B' ? "#4a2020" : "#3a3a3a";
     ctx.lineWidth = 4;
     ctx.beginPath();
     for (let x = 0; x <= WORLD_WIDTH; x += SCREEN_WIDTH) {
@@ -565,9 +619,9 @@ function drawWorld(ctx) {
         }
 
         if (!p.rotation) {
-            ctx.fillStyle = "#3b7dd8";
+            ctx.fillStyle = currentDimension === 'B' ? "#8a3030" : "#3b7dd8";
             ctx.fillRect(p.x, p.y, p.width, p.height);
-            ctx.fillStyle = "#5aa0ff";
+            ctx.fillStyle = currentDimension === 'B' ? "#c05050" : "#5aa0ff";
             ctx.fillRect(p.x, p.y, p.width, 8);
         } else {
             const cx = p.x + p.width / 2;
@@ -575,9 +629,9 @@ function drawWorld(ctx) {
             ctx.save();
             ctx.translate(cx, cy);
             ctx.rotate(p.rotation * Math.PI / 180);
-            ctx.fillStyle = "#3b7dd8";
+            ctx.fillStyle = currentDimension === 'B' ? "#8a3030" : "#3b7dd8";
             ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
-            ctx.fillStyle = "#5aa0ff";
+            ctx.fillStyle = currentDimension === 'B' ? "#c05050" : "#5aa0ff";
             ctx.fillRect(-p.width / 2, -p.height / 2, p.width, 8);
             ctx.restore();
         }
@@ -597,6 +651,31 @@ function drawHud(ctx) {
         ctx.fillText("PAUSED", VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
+    }
+
+    if (currentDimension === 'B') {
+        const barW = 400;
+        const barH = 20;
+        const barX = (VIEW_WIDTH - barW) / 2;
+        const barY = 30;
+        
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.fillRect(barX, barY, barW, barH);
+        
+        const pct = Math.max(0, saturation / MAX_SATURATION);
+        ctx.fillStyle = pct > 0.3 ? "#f0f" : "#f00";
+        ctx.fillRect(barX, barY, barW * pct, barH);
+        
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(barX, barY, barW, barH);
+        
+        ctx.fillStyle = "#fff";
+        ctx.font = "16px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText("SATURATION", barX + barW / 2, barY + barH + 5);
+        ctx.textAlign = "left";
     }
 }
 
@@ -634,6 +713,10 @@ function normalizeKey(e) {
 }
 
 document.addEventListener("keydown", e => {
+    if (e.key === 'Shift') {
+        if (!e.repeat) toggleDimension();
+        return;
+    }
     const key = normalizeKey(e);
     if (!(key in keys)) return;
 
